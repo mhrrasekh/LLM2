@@ -17,25 +17,18 @@ const sendSelectors = [
   "button[aria-label*='ارسال']"
 ];
 
-export class ChatGPTProvider extends BaseProvider {
-  get name() {
-    return "chatgpt-web";
-  }
+const conversationIdPattern = /\/c\/([a-zA-Z0-9-]+)/;
 
-  get capabilities() {
-    return CHATGPT_CAPABILITIES;
-  }
+export class ChatGPTProvider extends BaseProvider {
+  get name() { return "chatgpt-web"; }
+  get capabilities() { return CHATGPT_CAPABILITIES; }
 
   async ensurePage() {
     const context = await getContext();
     let page = context.pages()[0];
     if (!page) page = await context.newPage();
-
     if (!page.url().startsWith("https://chatgpt.com")) {
-      await page.goto(config.llmUrl, {
-        waitUntil: "domcontentloaded",
-        timeout: config.requestTimeoutMs
-      });
+      await page.goto(config.llmUrl, { waitUntil: "domcontentloaded", timeout: config.requestTimeoutMs });
     }
     return page;
   }
@@ -44,25 +37,15 @@ export class ChatGPTProvider extends BaseProvider {
     try {
       const page = await this.ensurePage();
       const input = await this.findVisible(page, inputSelectors);
-      return {
-        provider: this.name,
-        ready: Boolean(input),
-        authenticated: Boolean(input),
-        url: page.url()
-      };
+      return { provider: this.name, ready: Boolean(input), authenticated: Boolean(input), url: page.url() };
     } catch (error) {
-      return {
-        provider: this.name,
-        ready: false,
-        authenticated: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
+      return { provider: this.name, ready: false, authenticated: false, error: error instanceof Error ? error.message : String(error) };
     }
   }
 
   async getConversationState() {
     const page = await this.ensurePage();
-    const match = page.url().match(/\/c\/([a-zA-Z0-9-]+)/);
+    const match = page.url().match(conversationIdPattern);
     return match?.[1]
       ? { native: true, nativeId: match[1], nativeUrl: page.url() }
       : { native: false, nativeId: null, nativeUrl: null };
@@ -74,7 +57,8 @@ export class ChatGPTProvider extends BaseProvider {
     if (page.url() === state.nativeUrl) return true;
     try {
       await page.goto(state.nativeUrl, { waitUntil: "domcontentloaded", timeout: config.requestTimeoutMs });
-      return Boolean(page.url().match(/\/c\/([a-zA-Z0-9-]+)/));
+      await page.waitForTimeout(300);
+      return Boolean(page.url().match(conversationIdPattern));
     } catch {
       return false;
     }
@@ -83,20 +67,16 @@ export class ChatGPTProvider extends BaseProvider {
   async chat(messages) {
     const page = await this.ensurePage();
     await page.bringToFront();
-
     const input = await this.findVisible(page, inputSelectors);
     if (!input) {
-      throw new ProviderError(
-        "CHATGPT_INPUT_NOT_FOUND",
-        "ChatGPT input was not found. Open the browser and sign in normally if required."
-      );
+      throw new ProviderError("CHATGPT_INPUT_NOT_FOUND", "ChatGPT input was not found. Open the browser and sign in normally if required.");
     }
 
     const before = await this.responseSnapshot(page);
-    const prompt = this.formatMessages(messages);
+    const hasNativeConversation = Boolean(page.url().match(conversationIdPattern));
+    const promptMessages = hasNativeConversation ? this.latestTurnWithSystemContext(messages) : messages;
 
-    await input.fill(prompt);
-
+    await input.fill(this.formatMessages(promptMessages));
     const send = await this.findVisible(page, sendSelectors);
     if (send) await send.click();
     else await input.press("Enter");
@@ -105,10 +85,14 @@ export class ChatGPTProvider extends BaseProvider {
     await this.waitForResponse(page, before);
 
     const response = await this.latestResponse(page);
-    if (!response) {
-      throw new ProviderError("CHATGPT_RESPONSE_NOT_FOUND", "ChatGPT response was not found.");
-    }
+    if (!response) throw new ProviderError("CHATGPT_RESPONSE_NOT_FOUND", "ChatGPT response was not found.");
     return response;
+  }
+
+  latestTurnWithSystemContext(messages) {
+    const system = messages.filter(message => message.role === "system");
+    const user = [...messages].reverse().find(message => message.role === "user");
+    return user ? [...system, user] : system;
   }
 
   formatMessages(messages) {
@@ -141,25 +125,16 @@ export class ChatGPTProvider extends BaseProvider {
     const deadline = Date.now() + config.requestTimeoutMs;
     let stable = 0;
     let last = "";
-
     while (Date.now() < deadline) {
       const current = (await this.latestResponse(page)).trim();
       const changed = current && (!before.length || current !== before.at(-1)?.trim());
-
       if (changed) {
         if (current === last) stable++;
-        else {
-          stable = 0;
-          last = current;
-        }
+        else { stable = 0; last = current; }
         if (stable >= 3) return;
       }
       await page.waitForTimeout(1000);
     }
-
-    throw new ProviderError(
-      "CHATGPT_RESPONSE_TIMEOUT",
-      "Timed out while waiting for the ChatGPT response."
-    );
+    throw new ProviderError("CHATGPT_RESPONSE_TIMEOUT", "Timed out while waiting for the ChatGPT response.");
   }
 }
