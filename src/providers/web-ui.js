@@ -8,23 +8,15 @@ export class WebUIProvider extends BaseProvider {
     this.definition = definition;
   }
 
-  get name() {
-    return this.definition.name;
-  }
-
-  get capabilities() {
-    return this.definition.capabilities;
-  }
+  get name() { return this.definition.name; }
+  get capabilities() { return this.definition.capabilities; }
 
   async ensurePage() {
     const context = await getContext();
     let page = context.pages().find(p => p.url().startsWith(this.definition.origin));
     if (!page) page = await context.newPage();
     if (!page.url().startsWith(this.definition.origin)) {
-      await page.goto(this.definition.url, {
-        waitUntil: "domcontentloaded",
-        timeout: config.requestTimeoutMs
-      });
+      await page.goto(this.definition.url, { waitUntil: "domcontentloaded", timeout: config.requestTimeoutMs });
     }
     return page;
   }
@@ -33,19 +25,9 @@ export class WebUIProvider extends BaseProvider {
     try {
       const page = await this.ensurePage();
       const input = await this.findVisible(page, this.definition.inputSelectors);
-      return {
-        provider: this.name,
-        ready: Boolean(input),
-        authenticated: Boolean(input),
-        url: page.url()
-      };
+      return { provider: this.name, ready: Boolean(input), authenticated: Boolean(input), url: page.url() };
     } catch (error) {
-      return {
-        provider: this.name,
-        ready: false,
-        authenticated: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
+      return { provider: this.name, ready: false, authenticated: false, error: error instanceof Error ? error.message : String(error) };
     }
   }
 
@@ -79,17 +61,13 @@ export class WebUIProvider extends BaseProvider {
     const page = await this.ensurePage();
     await page.bringToFront();
     const input = await this.findVisible(page, this.definition.inputSelectors);
-
-    if (!input) {
-      throw new ProviderError(
-        this.definition.errors.input,
-        this.definition.errors.inputMessage
-      );
-    }
+    if (!input) throw new ProviderError(this.definition.errors.input, this.definition.errors.inputMessage);
 
     const before = await this.snapshot(page);
-    await input.fill(this.formatMessages(messages));
+    const hasNativeConversation = Boolean(this.extractConversationId(page.url()));
+    const promptMessages = hasNativeConversation ? this.latestTurnWithSystemContext(messages) : messages;
 
+    await input.fill(this.formatMessages(promptMessages));
     const send = await this.findVisible(page, this.definition.sendSelectors);
     if (send) await send.click();
     else await input.press("Enter");
@@ -98,16 +76,19 @@ export class WebUIProvider extends BaseProvider {
     await this.waitForResponse(page, before);
 
     const response = await this.latestResponse(page);
-    if (!response) {
-      throw new ProviderError(this.definition.errors.response, "Provider response was not found.");
-    }
+    if (!response) throw new ProviderError(this.definition.errors.response, "Provider response was not found.");
     return response;
+  }
+
+  latestTurnWithSystemContext(messages) {
+    const system = messages.filter(message => message.role === "system");
+    const user = [...messages].reverse().find(message => message.role === "user");
+    return user ? [...system, user] : system;
   }
 
   formatMessages(messages) {
     return messages.map(message =>
-      "[" + String(message.role || "user").toUpperCase() + "]\n" +
-      String(message.content || "").trim()
+      "[" + String(message.role || "user").toUpperCase() + "]\n" + String(message.content || "").trim()
     ).join("\n\n");
   }
 
@@ -133,25 +114,16 @@ export class WebUIProvider extends BaseProvider {
     const deadline = Date.now() + config.requestTimeoutMs;
     let stable = 0;
     let last = "";
-
     while (Date.now() < deadline) {
       const current = (await this.latestResponse(page)).trim();
       const changed = current && (!before.length || current !== before.at(-1)?.trim());
-
       if (changed) {
         if (current === last) stable++;
-        else {
-          stable = 0;
-          last = current;
-        }
+        else { stable = 0; last = current; }
         if (stable >= 3) return;
       }
       await page.waitForTimeout(1000);
     }
-
-    throw new ProviderError(
-      this.definition.errors.timeout,
-      "Timed out while waiting for the provider response."
-    );
+    throw new ProviderError(this.definition.errors.timeout, "Timed out while waiting for the provider response.");
   }
 }
