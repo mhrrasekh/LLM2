@@ -145,3 +145,36 @@ Memory endpoints:
 Send `"memory": false` on a request to bypass memory for that request.
 
 Memory is intentionally local and does not extract provider cookies, tokens, credentials or browser session data. The memory layer is gateway-side conversation context; it does not yet create independent native provider conversations.
+
+
+## v0.7 Memory Intelligence
+
+The memory layer now separates short-term conversation history from explicit long-term user memories.
+
+Memory types:
+- `fact`
+- `preference`
+- `goal`
+
+Long-term memories are stored locally in the same memory file and can be explicitly managed through:
+- `GET /v1/memories?session_id=...`
+- `POST /v1/memories`
+- `POST /v1/memories/search`
+- `PATCH /v1/memories/:memoryId`
+- `DELETE /v1/memories/:memoryId`
+
+The bridge also performs a small deterministic extraction pass for clear user statements such as "My name is ..." / "اسم من ..." and preference/goal statements. This is intentionally rule-based in v0.7: it does not send private memory data to a separate model and does not claim semantic understanding beyond the supported patterns.
+
+Relevant memories are retrieved using local token overlap plus importance and injected as a `[RELEVANT_USER_MEMORY]` system context. Full client-supplied message histories are now preserved; memory is no longer limited to requests containing exactly one user message.
+
+A request may include `conversation_id` to reuse an existing gateway conversation when it belongs to the same session and provider. Conversation IDs remain gateway-side; native provider conversation IDs are still not claimed.
+
+Privacy:
+- Memory is local to the configured JSON file.
+- No cookies, provider tokens, passwords or browser credentials are stored by the memory layer.
+- Use `memory: false` to bypass memory for a request.
+- Delete individual memories or the entire session memory when needed.
+
+Configuration:
+- `MAX_MEMORY_MEMORIES=100`
+- `MEMORY_RELEVANCE_LIMIT=8`
