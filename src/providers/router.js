@@ -49,7 +49,6 @@ export function createProviderRouter() {
   return new ProviderRouter(new Map([
     ["browser", chatgpt],
     ["chatgpt", chatgpt],
-    ["astra-6", chatgpt],
     ["gemini", gemini],
     ["claude", claude],
     ["grok", grok],
