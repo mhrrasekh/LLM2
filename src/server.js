@@ -152,7 +152,14 @@ export function createApp({
       const messages = validateMessages(req.body?.messages);
       const headerSessionId = req.header("x-session-id");
       const cookieSessionId = readCookie(req.headers.cookie, "llm2_session");
-      const sessionId = sessionManager.ensure(headerSessionId || cookieSessionId).id;
+      const session = sessionManager.ensure(headerSessionId || cookieSessionId);
+      const sessionId = typeof session === "string" ? session : session.id;
+      if (!sessionId) {
+        const error = new Error("Failed to establish a browser bridge session.");
+        error.code = "SESSION_CREATE_FAILED";
+        error.status = 500;
+        throw error;
+      }
       res.setHeader("Set-Cookie", "llm2_session=" + encodeURIComponent(sessionId) + "; Path=/; HttpOnly; SameSite=Lax");
       const model = typeof req.body?.model === "string" ? req.body.model : "browser";
       const provider = router.get(model);
