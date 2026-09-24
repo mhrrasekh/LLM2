@@ -233,3 +233,32 @@ test("ConversationManager stores native provider conversation state", async () =
   assert.equal(conversation.nativeId, "abc-123");
   assert.equal(conversation.nativeUrl, "https://chatgpt.com/c/abc-123");
 });
+
+
+test("Web UI providers send only the newest user turn inside a native conversation", async () => {
+  const { ChatGPTProvider } = await import("../src/providers/chatgpt.js");
+  const provider = new ChatGPTProvider();
+  const messages = [
+    { role: "user", content: "First question" },
+    { role: "assistant", content: "First answer" },
+    { role: "user", content: "Second question" }
+  ];
+  assert.deepEqual(provider.latestTurnWithSystemContext(messages), [
+    { role: "user", content: "Second question" }
+  ]);
+});
+
+test("Web UI providers preserve system context while selecting the newest user turn", async () => {
+  const { ChatGPTProvider } = await import("../src/providers/chatgpt.js");
+  const provider = new ChatGPTProvider();
+  const messages = [
+    { role: "system", content: "Be concise." },
+    { role: "user", content: "First question" },
+    { role: "assistant", content: "First answer" },
+    { role: "user", content: "Second question" }
+  ];
+  assert.deepEqual(provider.latestTurnWithSystemContext(messages), [
+    { role: "system", content: "Be concise." },
+    { role: "user", content: "Second question" }
+  ]);
+});
