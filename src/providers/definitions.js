@@ -82,7 +82,7 @@ export const providerDefinitions = {
     }
   }
 
-  grok: {
+  ,grok: {
     name: "grok-web",
     url: "https://grok.com/",
     origin: "https://grok.com",
