@@ -152,9 +152,3 @@ function normalizeError(error) {
   };
 }
 
-if (process.env.NODE_ENV !== "test") {
-  const app = createApp();
-  app.listen(config.port, "127.0.0.1", () => {
-    console.log("browser-llm-bridge listening on http://127.0.0.1:" + config.port);
-  });
-}
