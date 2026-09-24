@@ -19,5 +19,8 @@ export const config = {
   maxSessions: positiveInt(process.env.MAX_SESSIONS, 100),
   memoryFile: path.resolve(process.env.MEMORY_FILE || "./data/memory.json"),
   maxMemoryMessages: positiveInt(process.env.MAX_MEMORY_MESSAGES, 100),
-  memoryEnabled: process.env.MEMORY_ENABLED !== "false"
+  memoryEnabled: process.env.MEMORY_ENABLED !== "false",
+  memorySummaryEvery: positiveInt(process.env.MEMORY_SUMMARY_EVERY, 20),
+  maxMemorySummaryChars: positiveInt(process.env.MAX_MEMORY_SUMMARY_CHARS, 4000),
+  maxConversations: positiveInt(process.env.MAX_CONVERSATIONS, 100)
 };
