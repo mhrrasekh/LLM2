@@ -159,6 +159,7 @@ export function createApp({
         if (existing && existing.sessionId === sessionId && existing.provider === provider.name) conversation = existing;
       }
       if (!conversation) conversation = conversationManager.ensure(sessionId, provider.name);
+      if (conversation.native) await provider.restoreConversation(conversation);
       const contextMessages = await memoryManager.buildContext(sessionId, messages, memoryEnabled);
 
       res.setHeader("X-Request-ID", requestId);
@@ -176,6 +177,10 @@ export function createApp({
       });
 
       const content = await requestManager.run(() => provider.chat(contextMessages));
+      const nativeState = await provider.getConversationState();
+      if (nativeState.native) {
+        conversationManager.ensure(sessionId, provider.name, nativeState);
+      }
 
       if (memoryEnabled) {
         await memoryManager.remember(sessionId, [
