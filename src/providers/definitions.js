@@ -3,6 +3,7 @@ export const providerDefinitions = {
     name: "chatgpt-web",
     url: "https://chatgpt.com/",
     origin: "https://chatgpt.com",
+    conversationIdPattern: /\/c\/([a-zA-Z0-9-]+)/,
     inputSelectors: [
       "#prompt-textarea",
       "textarea[data-testid='text-input']",
@@ -31,6 +32,7 @@ export const providerDefinitions = {
     name: "gemini-web",
     url: "https://gemini.google.com/",
     origin: "https://gemini.google.com",
+    conversationIdPattern: /\/app\/([a-zA-Z0-9-]+)/,
     inputSelectors: [
       "rich-textarea .ql-editor",
       "div[contenteditable='true'][role='textbox']",
@@ -57,6 +59,7 @@ export const providerDefinitions = {
     name: "claude-web",
     url: "https://claude.ai/new",
     origin: "https://claude.ai",
+    conversationIdPattern: /\/chat\/([a-zA-Z0-9-]+)/,
     inputSelectors: [
       "div[contenteditable='true'][role='textbox']",
       "textarea[placeholder*='Reply']",
