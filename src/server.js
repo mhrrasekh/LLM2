@@ -1,14 +1,15 @@
 import "dotenv/config";
 import express from "express";
 import crypto from "node:crypto";
-import { createProviders } from "./providers/index.js";
+import { createProviders, listCapabilities } from "./providers/index.js";
 import { RequestManager } from "./request-manager.js";
 import { browserStatus } from "./browser.js";
 import { config } from "./config.js";
 import { createLogger } from "./logger.js";
 import { ProviderError } from "./providers/base.js";
+import { SessionManager } from "./session-manager.js";
 
-export function createApp({ providers = createProviders(), requestManager = new RequestManager({ maxQueueSize: config.maxQueueSize }) } = {}) {
+export function createApp({ providers = createProviders(), requestManager = new RequestManager({ maxQueueSize: config.maxQueueSize }), sessionManager = new SessionManager() } = {}) {
   const app = express();
   const logger = createLogger("http");
 
@@ -22,7 +23,8 @@ export function createApp({ providers = createProviders(), requestManager = new 
       service: "browser-llm-bridge",
       provider: "chatgpt-web",
       browser,
-      queue: requestManager.status
+      queue: requestManager.status,
+      sessions: sessionManager.status()
     });
   });
 
@@ -35,6 +37,14 @@ export function createApp({ providers = createProviders(), requestManager = new 
       provider: health,
       queue: requestManager.status
     });
+  });
+
+  app.get("/v1/capabilities", (_req, res) => {
+    res.json({ object: "list", data: listCapabilities(providers) });
+  });
+
+  app.get("/v1/sessions", (_req, res) => {
+    res.json({ object: "sessions", ...sessionManager.status() });
   });
 
   app.get("/v1/models", (_req, res) => {
@@ -53,6 +63,7 @@ export function createApp({ providers = createProviders(), requestManager = new 
 
     try {
       const messages = validateMessages(req.body?.messages);
+      const sessionId = sessionManager.ensure(req.header("x-session-id"))?.id || sessionManager.create();
       const model = typeof req.body?.model === "string" ? req.body.model : "browser";
       const provider = providers.get(model) || providers.get("browser");
 
@@ -62,11 +73,20 @@ export function createApp({ providers = createProviders(), requestManager = new 
         });
       }
 
-      logger.info("request accepted", { requestId, model, messages: messages.length });
+      logger.info("request accepted", { requestId, sessionId, model, messages: messages.length });
 
       const content = await requestManager.run(() => provider.chat(messages));
 
-      res.json({
+      if (req.body?.stream === true) {
+        res.status(200);
+        res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        res.write("data: " + JSON.stringify({ id: "chatcmpl-browser-" + crypto.randomUUID(), object: "chat.completion.chunk", model, session_id: sessionId, choices: [{ index: 0, delta: { role: "assistant", content }, finish_reason: null }] }) + "\n\n");
+        res.write("data: " + JSON.stringify({ id: "chatcmpl-browser-" + crypto.randomUUID(), object: "chat.completion.chunk", model, session_id: sessionId, choices: [{ index: 0, delta: {}, finish_reason: "stop" }] }) + "\n\n");
+        res.write("data: [DONE]\n\n");
+        res.end();
+      } else res.json({
         id: "chatcmpl-browser-" + crypto.randomUUID(),
         object: "chat.completion",
         created: Math.floor(Date.now() / 1000),
