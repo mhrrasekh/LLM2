@@ -11,6 +11,8 @@ import { SessionManager } from "./session-manager.js";
 import { MemoryManager } from "./memory-manager.js";
 import { ConversationManager } from "./conversation-manager.js";
 import { ProjectManager } from "./project-manager.js";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 export function createApp({
   router = createProviderRouter(),
@@ -41,6 +43,8 @@ export function createApp({
 
   app.disable("x-powered-by");
   app.use(express.json({ limit: "1mb" }));
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  app.use(express.static(path.resolve(__dirname, "../public")));
 
   app.get("/health", async (_req, res) => {
     const browser = await browserStatus();
