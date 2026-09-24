@@ -16,8 +16,8 @@ Client -> HTTP API -> validation -> request queue -> provider adapter -> Playwri
 
 1. Run `npm install`
 2. Run `npx playwright install chromium`
-3. Run `npm start`
-4. On first use, sign in normally in the dedicated browser profile if required.
+3. Run `npm start` (provider browsers run headless by default)
+4. For first-time login, start once with `$env:HEADLESS="false"; npm start`, sign in normally in the dedicated browser profile, then stop the server and run `npm start` normally again.
 
 The default automation profile is `./browser-profile`. Keep it separate from your everyday Chrome profile.
 
