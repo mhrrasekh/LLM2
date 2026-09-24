@@ -1,5 +1,6 @@
 import { getContext } from "../browser.js";
 import { config } from "../config.js";
+import { BaseProvider, ProviderError } from "./base.js";
 
 const inputSelectors = [
   "#prompt-textarea",
@@ -15,7 +16,11 @@ const sendSelectors = [
   "button[aria-label*='ارسال']"
 ];
 
-export class ChatGPTProvider {
+export class ChatGPTProvider extends BaseProvider {
+  get name() {
+    return "chatgpt-web";
+  }
+
   async ensurePage() {
     const context = await getContext();
     let page = context.pages()[0];
@@ -30,17 +35,42 @@ export class ChatGPTProvider {
     return page;
   }
 
-  async chat(text) {
+  async health() {
+    try {
+      const page = await this.ensurePage();
+      const input = await this.findVisible(page, inputSelectors);
+      return {
+        provider: this.name,
+        ready: Boolean(input),
+        authenticated: Boolean(input),
+        url: page.url()
+      };
+    } catch (error) {
+      return {
+        provider: this.name,
+        ready: false,
+        authenticated: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+
+  async chat(messages) {
     const page = await this.ensurePage();
     await page.bringToFront();
 
     const input = await this.findVisible(page, inputSelectors);
     if (!input) {
-      throw new Error("CHATGPT_INPUT_NOT_FOUND: Open ChatGPT and sign in normally if required.");
+      throw new ProviderError(
+        "CHATGPT_INPUT_NOT_FOUND",
+        "ChatGPT input was not found. Open the browser and sign in normally if required."
+      );
     }
 
     const before = await this.responseSnapshot(page);
-    await input.fill(text);
+    const prompt = this.formatMessages(messages);
+
+    await input.fill(prompt);
 
     const send = await this.findVisible(page, sendSelectors);
     if (send) await send.click();
@@ -50,8 +80,18 @@ export class ChatGPTProvider {
     await this.waitForResponse(page, before);
 
     const response = await this.latestResponse(page);
-    if (!response) throw new Error("CHATGPT_RESPONSE_NOT_FOUND");
+    if (!response) {
+      throw new ProviderError("CHATGPT_RESPONSE_NOT_FOUND", "ChatGPT response was not found.");
+    }
     return response;
+  }
+
+  formatMessages(messages) {
+    return messages.map(message => {
+      const role = String(message.role || "user").toUpperCase();
+      const content = String(message.content || "").trim();
+      return "[" + role + "]\n" + content;
+    }).join("\n\n");
   }
 
   async findVisible(page, selectors) {
@@ -92,6 +132,9 @@ export class ChatGPTProvider {
       await page.waitForTimeout(1000);
     }
 
-    throw new Error("CHATGPT_RESPONSE_TIMEOUT");
+    throw new ProviderError(
+      "CHATGPT_RESPONSE_TIMEOUT",
+      "Timed out while waiting for the ChatGPT response."
+    );
   }
 }
