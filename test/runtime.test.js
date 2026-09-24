@@ -137,3 +137,29 @@ test("ProviderRouter rejects unknown models", async () => {
     error => error.code === "MODEL_NOT_FOUND" && error.status === 404
   );
 });
+
+
+test("MemoryManager persists and rebuilds conversation context", async () => {
+  const { MemoryManager } = await import("../src/memory-manager.js");
+  const filePath = (await import("node:os")).tmpdir() + "/llm2-memory-" + Date.now() + ".json";
+  const manager = new MemoryManager({ filePath, maxMessagesPerSession: 10 });
+  const sessionId = "sess_test";
+  await manager.remember(sessionId, [
+    { role: "user", content: "My name is Sina." },
+    { role: "assistant", content: "Nice to meet you, Sina." }
+  ]);
+
+  const context = await manager.buildContext(sessionId, [
+    { role: "user", content: "What is my name?" }
+  ], true);
+
+  assert.equal(context.length, 3);
+  assert.equal(context[0].content, "My name is Sina.");
+  assert.equal(context[2].content, "What is my name?");
+
+  const restored = new MemoryManager({ filePath, maxMessagesPerSession: 10 });
+  assert.equal((await restored.get(sessionId)).length, 2);
+
+  const fs = await import("node:fs/promises");
+  await fs.rm(filePath, { force: true });
+});
