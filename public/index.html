@@ -22,7 +22,7 @@
   <main class="wrap">
     <section class="card">
       <h1>LLM2</h1>
-      <p class="muted">Browser LLM Bridge — choose a provider/model and send a test message.</p>
+      <p class="muted">Browser LLM Bridge — providers, conversations, and controlled local project files.</p>
       <label for="model">Model / Provider</label>
       <select id="model"></select>
       <div style="height:14px"></div>
@@ -40,15 +40,42 @@ const modelEl=document.getElementById("model");
 const messageEl=document.getElementById("message");
 const statusEl=document.getElementById("status");
 const answerEl=document.getElementById("answer");
-const sendEl=document.getElementById("send");
+const sendEl=document.getElementById("send");\nconst projectEl=document.getElementById("project");\nconst projectPathEl=document.getElementById("projectPath");\nconst readFileEl=document.getElementById("readFile");
 
+async function loadProjects(){
+  try{
+    const r=await fetch("/v1/projects"); const j=await r.json();
+    projectEl.innerHTML='<option value="">No project selected</option>';
+    for(const p of (j.data||[])){
+      const o=document.createElement("option");
+      o.value=p.id; o.textContent=p.name+" — "+p.root;
+      projectEl.appendChild(o);
+    }
+  }catch(e){ statusEl.textContent="Could not load projects: "+e.message; }
+}
+async function readFile(){
+  if(!projectEl.value || !projectPathEl.value.trim()){
+    statusEl.textContent="Select a project and enter a relative file path.";
+    return;
+  }
+  readFileEl.disabled=true; statusEl.textContent="Reading local file…";
+  try{
+    const params=new URLSearchParams({path:projectPathEl.value.trim()});
+    const r=await fetch("/v1/projects/"+encodeURIComponent(projectEl.value)+"/file?"+params);
+    const j=await r.json();
+    if(!r.ok) throw new Error(j?.error?.message||"Read failed");
+    answerEl.textContent=j.content||"";
+    statusEl.textContent="Read "+j.path+" ("+j.bytes+" bytes)";
+  }catch(e){ answerEl.textContent="Error: "+e.message; statusEl.textContent="File read failed"; }
+  finally{ readFileEl.disabled=false; }
+}
 async function loadModels(){
   const r=await fetch("/v1/models"); const j=await r.json();
   modelEl.innerHTML="";
   for(const m of j.data){
     const o=document.createElement("option");
     o.value=m.id;
-    o.textContent=m.id==="astra-6" ? "GPT-6 Astra (ChatGPT Web)" : m.id;
+    o.textContent=m.id;
     modelEl.appendChild(o);
   }
   if([...modelEl.options].some(o=>o.value==="astra-6")) modelEl.value="astra-6";
