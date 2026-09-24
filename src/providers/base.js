@@ -19,4 +19,12 @@ export class BaseProvider {
   async chat(_messages) {
     throw new Error("Provider chat is not implemented.");
   }
+
+  async getConversationState() {
+    return { native: false, nativeId: null, nativeUrl: null };
+  }
+
+  async restoreConversation(_state) {
+    return false;
+  }
 }
