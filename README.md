@@ -124,3 +124,24 @@ Bridge session IDs are currently logical gateway sessions. They do not yet guara
 ## License
 
 MIT
+
+## v0.5 Persistent Memory
+
+The bridge now has a local persistent memory layer for logical sessions.
+
+When memory is enabled (the default), a request containing a single new user message automatically receives the stored session conversation as context. The resulting user/assistant turn is persisted to `data/memory.json`.
+
+Configuration:
+
+- `MEMORY_ENABLED=true`
+- `MEMORY_FILE=./data/memory.json`
+- `MAX_MEMORY_MESSAGES=100`
+
+Memory endpoints:
+
+- `GET /v1/sessions/:sessionId/memory`
+- `DELETE /v1/sessions/:sessionId/memory`
+
+Send `"memory": false` on a request to bypass memory for that request.
+
+Memory is intentionally local and does not extract provider cookies, tokens, credentials or browser session data. The memory layer is gateway-side conversation context; it does not yet create independent native provider conversations.
