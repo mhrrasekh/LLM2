@@ -20,7 +20,9 @@ export function createApp({
     maxMessagesPerSession: config.maxMemoryMessages,
     maxMessageChars: config.maxMessageChars,
     summaryEvery: config.memorySummaryEvery,
-    maxSummaryChars: config.maxMemorySummaryChars
+    maxSummaryChars: config.maxMemorySummaryChars,
+    maxMemoriesPerSession: config.maxMemoryMemories,
+    relevanceLimit: config.memoryRelevanceLimit
   }),
   conversationManager = new ConversationManager({
     ttlMs: config.sessionTtlMs,
