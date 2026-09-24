@@ -9,7 +9,7 @@ function positiveInt(value, fallback) {
 export const config = {
   port: positiveInt(process.env.PORT, 3000),
   llmUrl: process.env.LLM_URL || "https://chatgpt.com/",
-  headless: process.env.HEADLESS === "true",
+  headless: process.env.HEADLESS !== "false",
   browserProfile: path.resolve(process.env.BROWSER_PROFILE || "./browser-profile"),
   requestTimeoutMs: positiveInt(process.env.REQUEST_TIMEOUT_MS, 120000),
   maxQueueSize: positiveInt(process.env.MAX_QUEUE_SIZE, 4),
