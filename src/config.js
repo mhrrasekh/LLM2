@@ -24,5 +24,9 @@ export const config = {
   maxMemorySummaryChars: positiveInt(process.env.MAX_MEMORY_SUMMARY_CHARS, 4000),
   maxMemoryMemories: positiveInt(process.env.MAX_MEMORY_MEMORIES, 100),
   memoryRelevanceLimit: positiveInt(process.env.MEMORY_RELEVANCE_LIMIT, 8),
-  maxConversations: positiveInt(process.env.MAX_CONVERSATIONS, 100)
+  maxConversations: positiveInt(process.env.MAX_CONVERSATIONS, 100),
+  projectsFile: path.resolve(process.env.PROJECTS_FILE || "./data/projects.json"),
+  maxProjects: positiveInt(process.env.MAX_PROJECTS, 50),
+  maxProjectFileBytes: positiveInt(process.env.MAX_PROJECT_FILE_BYTES, 2000000),
+  maxProjectSearchResults: positiveInt(process.env.MAX_PROJECT_SEARCH_RESULTS, 100)
 };
