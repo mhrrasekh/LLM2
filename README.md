@@ -87,6 +87,40 @@ The bridge now provides:
 The current browser adapter still maps a session to the bridge request context rather than controlling separate native ChatGPT conversations. Streaming is currently **compatibility streaming**: the provider response is returned as one content delta followed by the final event. True token-by-token browser streaming remains a later phase.
 
 
+
+## v0.4 Provider Router
+
+The bridge now has an explicit provider router with browser adapters for:
+
+- `chatgpt`
+- `gemini`
+- `claude`
+
+Each provider exposes capability metadata through `GET /v1/capabilities`, and `GET /v1/models` is generated from the router rather than hard-coded.
+
+Example:
+
+~~~text
+POST /v1/chat/completions
+{
+  "model": "gemini",
+  "messages": [
+    { "role": "user", "content": "Hello" }
+  ]
+}
+~~~
+
+The same local API can therefore select the configured Web UI provider by model ID.
+
+### Provider status
+
+ChatGPT is the primary adapter inherited from the original MVP. Gemini and Claude adapters are now implemented as selector-driven Web UI adapters, but their selectors are **not guaranteed to match every current UI/account variant** and must be validated on the user's machine before being treated as production-ready.
+
+### Important session limitation
+
+Bridge session IDs are currently logical gateway sessions. They do not yet guarantee a separate native conversation inside each provider Web UI. Native per-conversation routing is intentionally deferred until the browser adapters have provider-specific conversation creation/navigation logic.
+
+
 ## License
 
 MIT
