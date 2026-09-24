@@ -1,7 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import crypto from "node:crypto";
-import { createProviders, listCapabilities } from "./providers/index.js";
+import { createProviderRouter } from "./providers/router.js";
 import { RequestManager } from "./request-manager.js";
 import { browserStatus } from "./browser.js";
 import { config } from "./config.js";
@@ -9,7 +9,7 @@ import { createLogger } from "./logger.js";
 import { ProviderError } from "./providers/base.js";
 import { SessionManager } from "./session-manager.js";
 
-export function createApp({ providers = createProviders(), requestManager = new RequestManager({ maxQueueSize: config.maxQueueSize }), sessionManager = new SessionManager({ ttlMs: config.sessionTtlMs, maxSessions: config.maxSessions }) } = {}) {
+export function createApp({ router = createProviderRouter(), requestManager = new RequestManager({ maxQueueSize: config.maxQueueSize }), sessionManager = new SessionManager({ ttlMs: config.sessionTtlMs, maxSessions: config.maxSessions }) } = {}) {
   const app = express();
   const logger = createLogger("http");
 
@@ -29,7 +29,7 @@ export function createApp({ providers = createProviders(), requestManager = new 
   });
 
   app.get("/ready", async (_req, res) => {
-    const provider = providers.get("browser");
+    const provider = router.get("browser");
     const health = provider ? await provider.health() : { ready: false };
     const ready = Boolean(health.ready);
     res.status(ready ? 200 : 503).json({
@@ -40,7 +40,7 @@ export function createApp({ providers = createProviders(), requestManager = new 
   });
 
   app.get("/v1/capabilities", (_req, res) => {
-    res.json({ object: "list", data: listCapabilities(providers) });
+    res.json({ object: "list", data: router.capabilities() });
   });
 
   app.get("/v1/sessions", (_req, res) => {
@@ -48,13 +48,7 @@ export function createApp({ providers = createProviders(), requestManager = new 
   });
 
   app.get("/v1/models", (_req, res) => {
-    res.json({
-      object: "list",
-      data: [
-        { id: "browser", object: "model", owned_by: "browser-llm-bridge" },
-        { id: "chatgpt", object: "model", owned_by: "browser-llm-bridge" }
-      ]
-    });
+    res.json({ object: "list", data: router.list() });
   });
 
   app.post("/v1/chat/completions", async (req, res) => {
@@ -65,13 +59,7 @@ export function createApp({ providers = createProviders(), requestManager = new 
       const messages = validateMessages(req.body?.messages);
       const sessionId = sessionManager.ensure(req.header("x-session-id"))?.id || sessionManager.create();
       const model = typeof req.body?.model === "string" ? req.body.model : "browser";
-      const provider = providers.get(model) || providers.get("browser");
-
-      if (!provider) {
-        return res.status(400).json({
-          error: { message: "Unknown model/provider.", type: "invalid_request_error", code: "MODEL_NOT_FOUND" }
-        });
-      }
+      const provider = router.get(model);
 
       res.setHeader("X-Request-ID", requestId);
       res.setHeader("X-Session-ID", sessionId);
