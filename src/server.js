@@ -9,7 +9,7 @@ import { createLogger } from "./logger.js";
 import { ProviderError } from "./providers/base.js";
 import { SessionManager } from "./session-manager.js";
 
-export function createApp({ providers = createProviders(), requestManager = new RequestManager({ maxQueueSize: config.maxQueueSize }), sessionManager = new SessionManager() } = {}) {
+export function createApp({ providers = createProviders(), requestManager = new RequestManager({ maxQueueSize: config.maxQueueSize }), sessionManager = new SessionManager({ ttlMs: config.sessionTtlMs, maxSessions: config.maxSessions }) } = {}) {
   const app = express();
   const logger = createLogger("http");
 
