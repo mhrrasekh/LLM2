@@ -11,7 +11,22 @@ import { SessionManager } from "./session-manager.js";
 import { MemoryManager } from "./memory-manager.js";
 import { ConversationManager } from "./conversation-manager.js";
 
-export function createApp({ router = createProviderRouter(), requestManager = new RequestManager({ maxQueueSize: config.maxQueueSize }), sessionManager = new SessionManager({ ttlMs: config.sessionTtlMs, maxSessions: config.maxSessions }), memoryManager = new MemoryManager({ filePath: config.memoryFile, maxMessagesPerSession: config.maxMemoryMessages, maxMessageChars: config.maxMessageChars, summaryEvery: config.memorySummaryEvery, maxSummaryChars: config.maxMemorySummaryChars }), conversationManager = new ConversationManager({ ttlMs: config.sessionTtlMs, maxConversations: config.maxConversations }) } = {}) {
+export function createApp({
+  router = createProviderRouter(),
+  requestManager = new RequestManager({ maxQueueSize: config.maxQueueSize }),
+  sessionManager = new SessionManager({ ttlMs: config.sessionTtlMs, maxSessions: config.maxSessions }),
+  memoryManager = new MemoryManager({
+    filePath: config.memoryFile,
+    maxMessagesPerSession: config.maxMemoryMessages,
+    maxMessageChars: config.maxMessageChars,
+    summaryEvery: config.memorySummaryEvery,
+    maxSummaryChars: config.maxMemorySummaryChars
+  }),
+  conversationManager = new ConversationManager({
+    ttlMs: config.sessionTtlMs,
+    maxConversations: config.maxConversations
+  })
+} = {}) {
   const app = express();
   const logger = createLogger("http");
 
@@ -23,7 +38,6 @@ export function createApp({ router = createProviderRouter(), requestManager = ne
     res.json({
       ok: true,
       service: "browser-llm-bridge",
-      provider: "chatgpt-web",
       browser,
       queue: requestManager.status,
       sessions: sessionManager.status(),
@@ -33,14 +47,14 @@ export function createApp({ router = createProviderRouter(), requestManager = ne
   });
 
   app.get("/ready", async (_req, res) => {
-    const provider = router.get("browser");
-    const health = provider ? await provider.health() : { ready: false };
-    const ready = Boolean(health.ready);
-    res.status(ready ? 200 : 503).json({
-      ok: ready,
-      provider: health,
-      queue: requestManager.status
-    });
+    try {
+      const provider = router.get("browser");
+      const health = await provider.health();
+      const ready = Boolean(health.ready);
+      res.status(ready ? 200 : 503).json({ ok: ready, provider: health, queue: requestManager.status });
+    } catch (error) {
+      res.status(503).json({ ok: false, error: { code: error.code || "NOT_READY", message: error.message } });
+    }
   });
 
   app.get("/v1/capabilities", (_req, res) => {
@@ -51,7 +65,35 @@ export function createApp({ router = createProviderRouter(), requestManager = ne
     res.json({ object: "sessions", ...sessionManager.status() });
   });
 
-  app.get("/v1/conversations", (_req, res) => {\n    res.json({ object: "conversations", ...conversationManager.status() });\n  });\n\n  app.get("/v1/conversations/:conversationId", (req, res) => {\n    const conversation = conversationManager.get(req.params.conversationId);\n    if (!conversation) return res.status(404).json({ error: { code: "CONVERSATION_NOT_FOUND", message: "Conversation not found." } });\n    res.json(conversation);\n  });\n\n  app.delete("/v1/conversations/:conversationId", (req, res) => {\n    const removed = conversationManager.remove(req.params.conversationId);\n    res.status(removed ? 200 : 404).json({ ok: removed });\n  });\n\n  app.get("/v1/models", (_req, res) => {
+  app.get("/v1/sessions/:sessionId/memory", async (req, res) => {
+    res.json({ object: "memory", session_id: req.params.sessionId, ...(await memoryManager.getRecord(req.params.sessionId)) });
+  });
+
+  app.delete("/v1/sessions/:sessionId/memory", async (req, res) => {
+    await memoryManager.clear(req.params.sessionId);
+    res.json({ ok: true, session_id: req.params.sessionId });
+  });
+
+  app.get("/v1/conversations", (_req, res) => {
+    res.json({ object: "conversations", ...conversationManager.status() });
+  });
+
+  app.get("/v1/conversations/:conversationId", (req, res) => {
+    const conversation = conversationManager.get(req.params.conversationId);
+    if (!conversation) {
+      return res.status(404).json({
+        error: { code: "CONVERSATION_NOT_FOUND", message: "Conversation not found." }
+      });
+    }
+    res.json(conversation);
+  });
+
+  app.delete("/v1/conversations/:conversationId", (req, res) => {
+    const removed = conversationManager.remove(req.params.conversationId);
+    res.status(removed ? 200 : 404).json({ ok: removed });
+  });
+
+  app.get("/v1/models", (_req, res) => {
     res.json({ object: "list", data: router.list() });
   });
 
@@ -61,36 +103,76 @@ export function createApp({ router = createProviderRouter(), requestManager = ne
 
     try {
       const messages = validateMessages(req.body?.messages);
-      const sessionId = sessionManager.ensure(req.header("x-session-id"))?.id || sessionManager.create();
+      const sessionId = sessionManager.ensure(req.header("x-session-id")).id;
       const model = typeof req.body?.model === "string" ? req.body.model : "browser";
       const provider = router.get(model);
+      const memoryEnabled = req.body?.memory !== false && config.memoryEnabled;
+      const conversation = conversationManager.ensure(sessionId, provider.name);
+      const contextMessages = await memoryManager.buildContext(sessionId, messages, memoryEnabled);
 
       res.setHeader("X-Request-ID", requestId);
       res.setHeader("X-Session-ID", sessionId);
-      logger.info("request accepted", { requestId, sessionId, conversationId: conversation.id, model, messages: messages.length, contextMessages: contextMessages.length, memoryEnabled });
+      res.setHeader("X-Conversation-ID", conversation.id);
 
-      const content = await requestManager.run(() => provider.chat(contextMessages));\n      if (memoryEnabled) await memoryManager.remember(sessionId, [messages.at(-1), { role: "assistant", content }]);
+      logger.info("request accepted", {
+        requestId,
+        sessionId,
+        conversationId: conversation.id,
+        model,
+        messages: messages.length,
+        contextMessages: contextMessages.length,
+        memoryEnabled
+      });
+
+      const content = await requestManager.run(() => provider.chat(contextMessages));
+
+      if (memoryEnabled) {
+        await memoryManager.remember(sessionId, [
+          messages.at(-1),
+          { role: "assistant", content }
+        ]);
+      }
+
+      const completionId = "chatcmpl-browser-" + crypto.randomUUID();
 
       if (req.body?.stream === true) {
         res.status(200);
         res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
         res.setHeader("Cache-Control", "no-cache");
         res.setHeader("Connection", "keep-alive");
-        res.write("data: " + JSON.stringify({ id: "chatcmpl-browser-" + crypto.randomUUID(), object: "chat.completion.chunk", model, session_id: sessionId, conversation_id: conversation.id, choices: [{ index: 0, delta: { role: "assistant", content }, finish_reason: null }] }) + "\n\n");
-        res.write("data: " + JSON.stringify({ id: "chatcmpl-browser-" + crypto.randomUUID(), object: "chat.completion.chunk", model, session_id: sessionId, choices: [{ index: 0, delta: {}, finish_reason: "stop" }] }) + "\n\n");
+        res.write("data: " + JSON.stringify({
+          id: completionId,
+          object: "chat.completion.chunk",
+          model,
+          session_id: sessionId,
+          conversation_id: conversation.id,
+          choices: [{ index: 0, delta: { role: "assistant", content }, finish_reason: null }]
+        }) + "\n\n");
+        res.write("data: " + JSON.stringify({
+          id: completionId,
+          object: "chat.completion.chunk",
+          model,
+          session_id: sessionId,
+          conversation_id: conversation.id,
+          choices: [{ index: 0, delta: {}, finish_reason: "stop" }]
+        }) + "\n\n");
         res.write("data: [DONE]\n\n");
         res.end();
-      } else res.json({
-        id: "chatcmpl-browser-" + crypto.randomUUID(),
-        object: "chat.completion",
-        created: Math.floor(Date.now() / 1000),
-        model,
-        choices: [{
-          index: 0,
-          message: { role: "assistant", content },
-          finish_reason: "stop"
-        }]
-      });
+      } else {
+        res.json({
+          id: completionId,
+          object: "chat.completion",
+          created: Math.floor(Date.now() / 1000),
+          model,
+          session_id: sessionId,
+          conversation_id: conversation.id,
+          choices: [{
+            index: 0,
+            message: { role: "assistant", content },
+            finish_reason: "stop"
+          }]
+        });
+      }
 
       logger.info("request completed", { requestId, durationMs: Date.now() - started });
     } catch (error) {
@@ -102,13 +184,15 @@ export function createApp({ router = createProviderRouter(), requestManager = ne
         error: normalized.message
       });
 
-      res.status(normalized.status).json({
-        error: {
-          message: normalized.message,
-          type: normalized.type,
-          code: normalized.code
-        }
-      });
+      if (!res.headersSent) {
+        res.status(normalized.status).json({
+          error: {
+            message: normalized.message,
+            type: normalized.type,
+            code: normalized.code
+          }
+        });
+      }
     }
   });
 
@@ -130,7 +214,7 @@ function validateMessages(input) {
     throw error;
   }
 
-  return input.map((message, index) => {
+  return input.map(message => {
     if (!message || !["system", "user", "assistant"].includes(message.role) || typeof message.content !== "string") {
       const error = new Error("Each message must contain a valid role and string content.");
       error.code = "INVALID_MESSAGE";
@@ -165,4 +249,3 @@ function normalizeError(error) {
     message: error instanceof Error ? error.message : String(error)
   };
 }
-
