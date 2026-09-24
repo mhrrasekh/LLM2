@@ -131,6 +131,27 @@ export class ProjectManager {
     return { project: id, query: needle, truncated: results.length >= this.maxSearchResults, results };
   }
 
+  async context(id, query, maxFiles = 8) {
+    const project = await this.get(id);
+    if (!project) throw projectError("PROJECT_NOT_FOUND", "Project not found.", 404);
+    const needle = String(query || "").trim().toLowerCase();
+    if (!needle) throw projectError("INVALID_CONTEXT_QUERY", "query is required.", 400);
+    const matches = [];
+    await walk(project.root, async file => {
+      if (matches.length >= maxFiles) return;
+      try {
+        const stat = await fs.stat(file);
+        if (!stat.isFile() || stat.size > this.maxFileBytes) return;
+        const text = await fs.readFile(file, "utf8");
+        const score = text.toLowerCase().includes(needle) ? 2 : 0;
+        const relative = path.relative(project.root, file);
+        const nameScore = relative.toLowerCase().includes(needle) ? 1 : 0;
+        if (score + nameScore > 0) matches.push({ path: relative, content: text });
+      } catch {}
+    });
+    return { project: id, query, files: matches };
+  }
+
   async git(id, args) {
     const project = await this.get(id);
     if (!project) throw projectError("PROJECT_NOT_FOUND", "Project not found.", 404);
