@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 
-const DEFAULT_IGNORES = new Set([".git", "node_modules", ".next", "dist", "build", "target", "coverage"]);
+const DEFAULT_IGNORES = new Set([".git", "node_modules", ".next", "dist", "build", "target", "coverage"]);\nconst PROTECTED_NAMES = new Set([".env", ".env.local", ".env.production", ".env.development", ".env.test", "credentials.json", "secrets.json"]);\nconst PROTECTED_SUFFIXES = [".pem", ".key"];
 
 export class ProjectManager {
   constructor({ filePath = "./data/projects.json", maxProjects = 50, maxFileBytes = 2_000_000, maxSearchResults = 100 } = {}) {
@@ -231,4 +231,25 @@ function projectError(code, message, status) {
   error.code = code;
   error.status = status;
   return error;
+}
+
+\nasync function realPathOrParent(target) {
+  try { return await fs.realpath(target); }
+  catch (error) {
+    if (error.code !== "ENOENT") throw error;
+    const parent = path.dirname(target);
+    if (parent === target) return path.resolve(target);
+    return path.join(await realPathOrParent(parent), path.basename(target));
+  }
+}
+
+function assertReadable(relativePath) {
+  const base = path.basename(relativePath).toLowerCase();
+  if (PROTECTED_NAMES.has(base) || PROTECTED_SUFFIXES.some(suffix => base.endsWith(suffix))) {
+    throw projectError("PROTECTED_FILE", "Access to protected credential/key files is blocked.", 403);
+  }
+}
+
+function assertWritable(relativePath) {
+  assertReadable(relativePath);
 }
