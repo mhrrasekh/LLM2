@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>LLM2</title>
+  <style>
+    :root{color-scheme:dark;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif}
+    body{margin:0;min-height:100vh;background:#0b0d12;color:#eef1f7}
+    .wrap{max-width:900px;margin:0 auto;padding:40px 20px}
+    .card{background:#121620;border:1px solid #252c3a;border-radius:18px;padding:24px;box-shadow:0 20px 60px #0006}
+    h1{margin:0 0 8px;font-size:28px}.muted{color:#98a2b3;margin:0 0 24px}
+    label{display:block;font-size:13px;color:#aab3c2;margin-bottom:8px}
+    select,textarea,button{width:100%;box-sizing:border-box;border:1px solid #30394a;border-radius:12px;background:#0d1119;color:#eef1f7;padding:12px;font:inherit}
+    select{cursor:pointer}.row{display:grid;grid-template-columns:1fr 140px;gap:12px;margin-top:14px}
+    textarea{min-height:150px;resize:vertical}.send{cursor:pointer;background:#fff;color:#111;border:0;font-weight:700}
+    .status{margin-top:16px;color:#98a2b3;font-size:13px}.answer{white-space:pre-wrap;margin-top:18px;padding:16px;background:#0d1119;border-radius:12px;min-height:30px}
+    @media(max-width:650px){.row{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <h1>LLM2</h1>
+      <p class="muted">Browser LLM Bridge — choose a provider/model and send a test message.</p>
+      <label for="model">Model / Provider</label>
+      <select id="model"></select>
+      <div style="height:14px"></div>
+      <label for="message">Message</label>
+      <textarea id="message" placeholder="پیام خود را بنویسید...">سلام، فقط بگو LLM2 OK</textarea>
+      <div class="row">
+        <div class="status" id="status">Loading models…</div>
+        <button class="send" id="send">Send</button>
+      </div>
+      <div class="answer" id="answer"></div>
+    </section>
+  </main>
+<script>
+const modelEl=document.getElementById("model");
+const messageEl=document.getElementById("message");
+const statusEl=document.getElementById("status");
+const answerEl=document.getElementById("answer");
+const sendEl=document.getElementById("send");
+
+async function loadModels(){
+  const r=await fetch("/v1/models"); const j=await r.json();
+  modelEl.innerHTML="";
+  for(const m of j.data){
+    const o=document.createElement("option");
+    o.value=m.id;
+    o.textContent=m.id==="astra-6" ? "GPT-6 Astra (ChatGPT Web)" : m.id;
+    modelEl.appendChild(o);
+  }
+  if([...modelEl.options].some(o=>o.value==="astra-6")) modelEl.value="astra-6";
+  statusEl.textContent=j.data.length+" model targets available";
+}
+async function send(){
+  sendEl.disabled=true; statusEl.textContent="Sending…"; answerEl.textContent="";
+  try{
+    const r=await fetch("/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+      model:modelEl.value,messages:[{role:"user",content:messageEl.value}]
+    })});
+    const j=await r.json();
+    if(!r.ok) throw new Error(j?.error?.message||"Request failed");
+    answerEl.textContent=j.choices?.[0]?.message?.content||"";
+    statusEl.textContent="Completed with "+j.model;
+  }catch(e){answerEl.textContent="Error: "+e.message;statusEl.textContent="Request failed"}
+  finally{sendEl.disabled=false}
+}
+sendEl.addEventListener("click",send);
+loadModels().catch(e=>statusEl.textContent="Could not load models: "+e.message);
+</script>
+</body>
+</html>
