@@ -49,6 +49,32 @@ export class WebUIProvider extends BaseProvider {
     }
   }
 
+  async getConversationState() {
+    const page = await this.ensurePage();
+    const url = page.url();
+    const nativeId = this.extractConversationId(url);
+    return nativeId ? { native: true, nativeId, nativeUrl: url } : { native: false, nativeId: null, nativeUrl: null };
+  }
+
+  async restoreConversation(state) {
+    if (!state?.nativeUrl) return false;
+    const page = await this.ensurePage();
+    if (page.url() === state.nativeUrl) return true;
+    try {
+      await page.goto(state.nativeUrl, { waitUntil: "domcontentloaded", timeout: config.requestTimeoutMs });
+      return Boolean(this.extractConversationId(page.url()));
+    } catch {
+      return false;
+    }
+  }
+
+  extractConversationId(url) {
+    const pattern = this.definition.conversationIdPattern;
+    if (!pattern) return null;
+    const match = String(url).match(pattern);
+    return match?.[1] || null;
+  }
+
   async chat(messages) {
     const page = await this.ensurePage();
     await page.bringToFront();
