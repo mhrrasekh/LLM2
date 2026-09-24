@@ -174,6 +174,15 @@ export function createApp({
     }
   });
 
+  app.get("/v1/projects/:projectId/files", async (req, res) => {
+    try {
+      res.json(await projectManager.listFiles(req.params.projectId, req.query.path || ""));
+    } catch (error) {
+      const normalized = normalizeError(error);
+      res.status(normalized.status).json({ error: { message: normalized.message, type: normalized.type, code: normalized.code } });
+    }
+  });
+
   app.get("/v1/projects/:projectId/file", async (req, res) => {
     try {
       res.json(await projectManager.readFile(req.params.projectId, req.query.path));
