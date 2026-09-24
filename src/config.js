@@ -14,5 +14,7 @@ export const config = {
   requestTimeoutMs: positiveInt(process.env.REQUEST_TIMEOUT_MS, 120000),
   maxQueueSize: positiveInt(process.env.MAX_QUEUE_SIZE, 4),
   maxMessages: positiveInt(process.env.MAX_MESSAGES, 40),
-  maxMessageChars: positiveInt(process.env.MAX_MESSAGE_CHARS, 20000)
+  maxMessageChars: positiveInt(process.env.MAX_MESSAGE_CHARS, 20000),
+  sessionTtlMs: positiveInt(process.env.SESSION_TTL_MS, 1800000),
+  maxSessions: positiveInt(process.env.MAX_SESSIONS, 100)
 };
