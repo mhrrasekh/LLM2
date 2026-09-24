@@ -40,11 +40,21 @@ export function createProviderRouter() {
   const chatgpt = new ChatGPTProvider();
   const gemini = new WebUIProvider(providerDefinitions.gemini);
   const claude = new WebUIProvider(providerDefinitions.claude);
+  const grok = new WebUIProvider(providerDefinitions.grok);
+  const deepseek = new WebUIProvider(providerDefinitions.deepseek);
+  const qwen = new WebUIProvider(providerDefinitions.qwen);
+  const mistral = new WebUIProvider(providerDefinitions.mistral);
+  const perplexity = new WebUIProvider(providerDefinitions.perplexity);
 
   return new ProviderRouter(new Map([
     ["browser", chatgpt],
     ["chatgpt", chatgpt],
     ["gemini", gemini],
-    ["claude", claude]
+    ["claude", claude],
+    ["grok", grok],
+    ["deepseek", deepseek],
+    ["qwen", qwen],
+    ["mistral", mistral],
+    ["perplexity", perplexity]
   ]));
 }
