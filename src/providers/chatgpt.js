@@ -60,6 +60,26 @@ export class ChatGPTProvider extends BaseProvider {
     }
   }
 
+  async getConversationState() {
+    const page = await this.ensurePage();
+    const match = page.url().match(/\/c\/([a-zA-Z0-9-]+)/);
+    return match?.[1]
+      ? { native: true, nativeId: match[1], nativeUrl: page.url() }
+      : { native: false, nativeId: null, nativeUrl: null };
+  }
+
+  async restoreConversation(state) {
+    if (!state?.nativeUrl) return false;
+    const page = await this.ensurePage();
+    if (page.url() === state.nativeUrl) return true;
+    try {
+      await page.goto(state.nativeUrl, { waitUntil: "domcontentloaded", timeout: config.requestTimeoutMs });
+      return Boolean(page.url().match(/\/c\/([a-zA-Z0-9-]+)/));
+    } catch {
+      return false;
+    }
+  }
+
   async chat(messages) {
     const page = await this.ensurePage();
     await page.bringToFront();
