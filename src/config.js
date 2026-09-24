@@ -22,5 +22,7 @@ export const config = {
   memoryEnabled: process.env.MEMORY_ENABLED !== "false",
   memorySummaryEvery: positiveInt(process.env.MEMORY_SUMMARY_EVERY, 20),
   maxMemorySummaryChars: positiveInt(process.env.MAX_MEMORY_SUMMARY_CHARS, 4000),
+  maxMemoryMemories: positiveInt(process.env.MAX_MEMORY_MEMORIES, 100),
+  memoryRelevanceLimit: positiveInt(process.env.MEMORY_RELEVANCE_LIMIT, 8),
   maxConversations: positiveInt(process.env.MAX_CONVERSATIONS, 100)
 };
