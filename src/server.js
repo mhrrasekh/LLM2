@@ -73,6 +73,8 @@ export function createApp({ providers = createProviders(), requestManager = new 
         });
       }
 
+      res.setHeader("X-Request-ID", requestId);
+      res.setHeader("X-Session-ID", sessionId);
       logger.info("request accepted", { requestId, sessionId, model, messages: messages.length });
 
       const content = await requestManager.run(() => provider.chat(messages));
