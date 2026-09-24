@@ -1,51 +1,76 @@
 # Browser LLM Bridge
 
-A local MVP exposing an OpenAI-compatible HTTP endpoint backed by an authorized Chrome session controlled with Playwright.
+Professional MVP: a local OpenAI-compatible HTTP bridge backed by an authorized ChatGPT Web browser session controlled with Playwright.
+
+## Architecture
+
+Client -> HTTP API -> validation -> request queue -> provider adapter -> Playwright -> ChatGPT Web
 
 ## Requirements
 
 - Node.js 20+
 - Google Chrome
-- Normal ChatGPT Web login in the dedicated browser profile
+- Normal ChatGPT Web login
 
 ## Setup
 
-1. Install dependencies: npm install
-2. Install Playwright browser support: npx playwright install chromium
-3. Start: npm start
+1. Run `npm install`
+2. Run `npx playwright install chromium`
+3. Run `npm start`
+4. On first use, sign in normally in the dedicated browser profile if required.
 
-The bridge uses ./browser-profile as a dedicated persistent browser profile. If ChatGPT asks for sign-in, sign in normally in the opened Chrome window.
+The default automation profile is `./browser-profile`. Keep it separate from your everyday Chrome profile.
 
-The project does not read or store passwords, cookies, session tokens, or API keys.
+## Endpoints
 
-## API
-
-GET http://127.0.0.1:3000/health
-
-GET http://127.0.0.1:3000/v1/models
-
-POST http://127.0.0.1:3000/v1/chat/completions
+- `GET /health` — bridge, browser and queue status
+- `GET /ready` — provider readiness
+- `GET /v1/models` — available bridge models
+- `POST /v1/chat/completions` — OpenAI-compatible chat response
 
 Example request:
 
-{
-  "model": "browser",
-  "messages": [
-    { "role": "user", "content": "سلام! یک جمله درباره هوش مصنوعی بگو." }
-  ]
-}
+    {
+      "model": "browser",
+      "messages": [
+        { "role": "system", "content": "Answer briefly." },
+        { "role": "user", "content": "Hello" }
+      ]
+    }
+
+## Professional MVP changes
+
+- Provider adapter boundary for future Web UI providers
+- Bounded request queue and serialized browser interactions
+- Request IDs and structured JSON logging
+- Input validation and configurable message limits
+- Health and readiness diagnostics
+- Mock-provider API tests
+- Dedicated startup entrypoint
+- Localhost-only HTTP binding
+
+## Tests
+
+Run `npm test`.
+
+The test suite uses a mock provider and does not require a real ChatGPT login.
+A GitHub Actions workflow also runs the test suite on pushes and pull requests to main.
+
+## Security boundary
+
+- No password collection
+- No cookie or session-token extraction
+- No authentication bypass
+- No CAPTCHA bypass
+- No quota or rate-limit bypass
+- No provider security bypass
+- Intended for accounts and services the user is authorized to automate
 
 ## Limitations
 
-This is browser automation, not an official ChatGPT API.
+ChatGPT Web is not an official API integration. DOM selectors can change. Streaming, tool calling, vision/files and provider failover are not implemented yet.
 
-It does not bypass authentication, CAPTCHA, quotas, rate limits, or provider security controls.
-
-ChatGPT Web may change its DOM selectors, so the provider adapter may need maintenance.
-
-Requests are serialized: one browser interaction at a time.
-
-The MVP sends the latest user message only; full conversation-history replay is not implemented yet.
+Playwright documents persistent contexts as storing browser session data in the supplied user-data directory and warns against automating the default Chrome user profile. Use the dedicated profile configured by this project.
 
 ## License
 
