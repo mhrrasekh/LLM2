@@ -7,7 +7,7 @@ export class ConversationManager {
     this.conversations = new Map();
   }
 
-  ensure(sessionId, provider) {
+  ensure(sessionId, provider, native = null) {
     this.prune();
     let conversation = [...this.conversations.values()].find(
       item => item.sessionId === sessionId && item.provider === provider
@@ -23,11 +23,18 @@ export class ConversationManager {
         provider,
         createdAt: Date.now(),
         lastUsedAt: Date.now(),
-        native: false
+        native: Boolean(native?.native),
+        nativeId: native?.nativeId || null,
+        nativeUrl: native?.nativeUrl || null
       };
       this.conversations.set(conversation.id, conversation);
     } else {
       conversation.lastUsedAt = Date.now();
+      if (native?.native) {
+        conversation.native = true;
+        conversation.nativeId = native.nativeId || conversation.nativeId;
+        conversation.nativeUrl = native.nativeUrl || conversation.nativeUrl;
+      }
     }
     return conversation;
   }
