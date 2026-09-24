@@ -8,8 +8,9 @@ import { config } from "./config.js";
 import { createLogger } from "./logger.js";
 import { ProviderError } from "./providers/base.js";
 import { SessionManager } from "./session-manager.js";
+import { MemoryManager } from "./memory-manager.js";
 
-export function createApp({ router = createProviderRouter(), requestManager = new RequestManager({ maxQueueSize: config.maxQueueSize }), sessionManager = new SessionManager({ ttlMs: config.sessionTtlMs, maxSessions: config.maxSessions }) } = {}) {
+export function createApp({ router = createProviderRouter(), requestManager = new RequestManager({ maxQueueSize: config.maxQueueSize }), sessionManager = new SessionManager({ ttlMs: config.sessionTtlMs, maxSessions: config.maxSessions }), memoryManager = new MemoryManager({ filePath: config.memoryFile, maxMessagesPerSession: config.maxMemoryMessages, maxMessageChars: config.maxMessageChars }) } = {}) {
   const app = express();
   const logger = createLogger("http");
 
@@ -24,7 +25,8 @@ export function createApp({ router = createProviderRouter(), requestManager = ne
       provider: "chatgpt-web",
       browser,
       queue: requestManager.status,
-      sessions: sessionManager.status()
+      sessions: sessionManager.status(),
+      memory: await memoryManager.status()
     });
   });
 
@@ -63,9 +65,9 @@ export function createApp({ router = createProviderRouter(), requestManager = ne
 
       res.setHeader("X-Request-ID", requestId);
       res.setHeader("X-Session-ID", sessionId);
-      logger.info("request accepted", { requestId, sessionId, model, messages: messages.length });
+      logger.info("request accepted", { requestId, sessionId, model, messages: messages.length, contextMessages: contextMessages.length, memoryEnabled });
 
-      const content = await requestManager.run(() => provider.chat(messages));
+      const content = await requestManager.run(() => provider.chat(contextMessages));\n      if (memoryEnabled) await memoryManager.remember(sessionId, [messages.at(-1), { role: "assistant", content }]);
 
       if (req.body?.stream === true) {
         res.status(200);
