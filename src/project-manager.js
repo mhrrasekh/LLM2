@@ -3,7 +3,8 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 
 const DEFAULT_IGNORES = new Set([".git", "node_modules", ".next", "dist", "build", "target", "coverage"]);
-const PROTECTED_NAMES = new Set([".env", ".env.local", ".env.production", ".env.development", ".env.test", "credentials.json", "secrets.json"]);\nconst PROTECTED_SUFFIXES = [".pem", ".key"];
+const PROTECTED_NAMES = new Set([".env", ".env.local", ".env.production", ".env.development", ".env.test", "credentials.json", "secrets.json"]);
+const PROTECTED_SUFFIXES = [".pem", ".key"];
 
 export class ProjectManager {
   constructor({ filePath = "./data/projects.json", maxProjects = 50, maxFileBytes = 2_000_000, maxSearchResults = 100 } = {}) {
