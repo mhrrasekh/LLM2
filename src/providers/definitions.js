@@ -81,4 +81,65 @@ export const providerDefinitions = {
       conversationSessions: true, tools: false, vision: false, files: false
     }
   }
+
+  grok: {
+    name: "grok-web",
+    url: "https://grok.com/",
+    origin: "https://grok.com",
+    conversationIdPattern: /\/(?:c|conversation)\/([a-zA-Z0-9-]+)/,
+    inputSelectors: [
+      "textarea[placeholder*='Ask']",
+      "textarea[placeholder*='Message']",
+      "textarea",
+      "[contenteditable='true'][role='textbox']"
+    ],
+    sendSelectors: ["button[aria-label*='Send']", "button[type='submit']"],
+    responseSelector: "[data-testid*='message'], [data-message-author-role='assistant']",
+    errors: { input: "GROK_INPUT_NOT_FOUND", response: "GROK_RESPONSE_NOT_FOUND", timeout: "GROK_RESPONSE_TIMEOUT", inputMessage: "Grok input was not found. Sign in normally if required." },
+    capabilities: { chat: true, streaming: "compatibility", systemMessages: true, conversationSessions: true, tools: false, vision: false, files: false }
+  },
+  deepseek: {
+    name: "deepseek-web",
+    url: "https://chat.deepseek.com/",
+    origin: "https://chat.deepseek.com",
+    conversationIdPattern: /\/(?:a|chat)\/([a-zA-Z0-9-]+)/,
+    inputSelectors: ["textarea", "textarea[placeholder*='Message']", "[contenteditable='true'][role='textbox']"],
+    sendSelectors: ["button[type='submit']", "button[aria-label*='Send']"],
+    responseSelector: "[data-testid*='message'], .ds-markdown",
+    errors: { input: "DEEPSEEK_INPUT_NOT_FOUND", response: "DEEPSEEK_RESPONSE_NOT_FOUND", timeout: "DEEPSEEK_RESPONSE_TIMEOUT", inputMessage: "DeepSeek input was not found. Sign in normally if required." },
+    capabilities: { chat: true, streaming: "compatibility", systemMessages: true, conversationSessions: true, tools: false, vision: false, files: false }
+  },
+  qwen: {
+    name: "qwen-web",
+    url: "https://chat.qwen.ai/",
+    origin: "https://chat.qwen.ai",
+    conversationIdPattern: /\/(?:c|chat)\/([a-zA-Z0-9-]+)/,
+    inputSelectors: ["textarea", "textarea[placeholder*='message']", "[contenteditable='true'][role='textbox']"],
+    sendSelectors: ["button[type='submit']", "button[aria-label*='Send']"],
+    responseSelector: "[data-testid*='message'], .markdown-body",
+    errors: { input: "QWEN_INPUT_NOT_FOUND", response: "QWEN_RESPONSE_NOT_FOUND", timeout: "QWEN_RESPONSE_TIMEOUT", inputMessage: "Qwen input was not found. Sign in normally if required." },
+    capabilities: { chat: true, streaming: "compatibility", systemMessages: true, conversationSessions: true, tools: false, vision: false, files: false }
+  },
+  mistral: {
+    name: "mistral-web",
+    url: "https://chat.mistral.ai/",
+    origin: "https://chat.mistral.ai",
+    conversationIdPattern: /\/(?:chat|conversation)\/([a-zA-Z0-9-]+)/,
+    inputSelectors: ["textarea", "textarea[placeholder*='message']", "[contenteditable='true'][role='textbox']"],
+    sendSelectors: ["button[type='submit']", "button[aria-label*='Send']"],
+    responseSelector: "[data-testid*='message'], .prose",
+    errors: { input: "MISTRAL_INPUT_NOT_FOUND", response: "MISTRAL_RESPONSE_NOT_FOUND", timeout: "MISTRAL_RESPONSE_TIMEOUT", inputMessage: "Mistral input was not found. Sign in normally if required." },
+    capabilities: { chat: true, streaming: "compatibility", systemMessages: true, conversationSessions: true, tools: false, vision: false, files: false }
+  },
+  perplexity: {
+    name: "perplexity-web",
+    url: "https://www.perplexity.ai/",
+    origin: "https://www.perplexity.ai",
+    conversationIdPattern: /\/search\/([a-zA-Z0-9-]+)/,
+    inputSelectors: ["textarea", "textarea[placeholder*='Ask']", "[contenteditable='true'][role='textbox']"],
+    sendSelectors: ["button[aria-label*='Submit']", "button[aria-label*='Send']", "button[type='submit']"],
+    responseSelector: "[data-testid*='answer'], .prose",
+    errors: { input: "PERPLEXITY_INPUT_NOT_FOUND", response: "PERPLEXITY_RESPONSE_NOT_FOUND", timeout: "PERPLEXITY_RESPONSE_TIMEOUT", inputMessage: "Perplexity input was not found. Sign in normally if required." },
+    capabilities: { chat: true, streaming: "compatibility", systemMessages: true, conversationSessions: true, tools: false, vision: false, files: false }
+  },
 };
