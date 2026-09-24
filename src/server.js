@@ -150,7 +150,10 @@ export function createApp({
 
     try {
       const messages = validateMessages(req.body?.messages);
-      const sessionId = sessionManager.ensure(req.header("x-session-id")).id;
+      const headerSessionId = req.header("x-session-id");
+      const cookieSessionId = readCookie(req.headers.cookie, "llm2_session");
+      const sessionId = sessionManager.ensure(headerSessionId || cookieSessionId).id;
+      res.setHeader("Set-Cookie", "llm2_session=" + encodeURIComponent(sessionId) + "; Path=/; HttpOnly; SameSite=Lax");
       const model = typeof req.body?.model === "string" ? req.body.model : "browser";
       const provider = router.get(model);
       const memoryEnabled = req.body?.memory !== false && config.memoryEnabled;
@@ -161,7 +164,14 @@ export function createApp({
         if (existing && existing.sessionId === sessionId && existing.provider === provider.name) conversation = existing;
       }
       if (!conversation) conversation = conversationManager.ensure(sessionId, provider.name);
-      if (conversation.native) await provider.restoreConversation(conversation);
+      if (conversation.native) {
+        const restored = await provider.restoreConversation(conversation);
+        if (!restored) {
+          conversation.native = false;
+          conversation.nativeId = null;
+          conversation.nativeUrl = null;
+        }
+      }
       const contextMessages = await memoryManager.buildContext(sessionId, messages, memoryEnabled);
 
       res.setHeader("X-Request-ID", requestId);
@@ -289,6 +299,20 @@ function validateMessages(input) {
 
     return { role: message.role, content: message.content };
   });
+}
+
+function readCookie(header, name) {
+  if (!header) return null;
+  const pair = String(header)
+    .split(";")
+    .map(part => part.trim())
+    .find(part => part.startsWith(name + "="));
+  if (!pair) return null;
+  try {
+    return decodeURIComponent(pair.slice(name.length + 1));
+  } catch {
+    return null;
+  }
 }
 
 function normalizeError(error) {
