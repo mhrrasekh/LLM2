@@ -72,6 +72,21 @@ ChatGPT Web is not an official API integration. DOM selectors can change. Stream
 
 Playwright documents persistent contexts as storing browser session data in the supplied user-data directory and warns against automating the default Chrome user profile. Use the dedicated profile configured by this project.
 
+
+## v0.3 Session & Streaming Layer
+
+The bridge now provides:
+
+- in-memory session IDs with TTL and a maximum session count
+- `X-Session-ID` request support
+- `GET /v1/sessions`
+- `GET /v1/capabilities`
+- `stream: true` SSE-compatible response mode
+- provider capability metadata
+
+The current browser adapter still maps a session to the bridge request context rather than controlling separate native ChatGPT conversations. Streaming is currently **compatibility streaming**: the provider response is returned as one content delta followed by the final event. True token-by-token browser streaming remains a later phase.
+
+
 ## License
 
 MIT
