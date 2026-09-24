@@ -78,7 +78,6 @@ async function loadModels(){
     o.textContent=m.id;
     modelEl.appendChild(o);
   }
-  if([...modelEl.options].some(o=>o.value==="astra-6")) modelEl.value="astra-6";
   statusEl.textContent=j.data.length+" model targets available";
 }
 async function send(){
