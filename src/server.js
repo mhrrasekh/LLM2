@@ -74,6 +74,51 @@ export function createApp({
     res.json({ ok: true, session_id: req.params.sessionId });
   });
 
+  app.get("/v1/memories", async (req, res) => {
+    const sessionId = req.header("x-session-id") || req.query.session_id;
+    if (!sessionId) return res.status(400).json({ error: { code: "SESSION_REQUIRED", message: "session_id or X-Session-ID is required." } });
+    res.json({ object: "list", session_id: sessionId, data: await memoryManager.listMemories(sessionId) });
+  });
+
+  app.post("/v1/memories", async (req, res) => {
+    try {
+      const sessionId = req.header("x-session-id") || req.body?.session_id;
+      if (!sessionId) return res.status(400).json({ error: { code: "SESSION_REQUIRED", message: "session_id or X-Session-ID is required." } });
+      const memory = await memoryManager.addMemory(sessionId, req.body);
+      res.status(201).json(memory);
+    } catch (error) {
+      const normalized = normalizeError(error);
+      res.status(normalized.status).json({ error: { message: normalized.message, type: normalized.type, code: normalized.code } });
+    }
+  });
+
+  app.post("/v1/memories/search", async (req, res) => {
+    const sessionId = req.header("x-session-id") || req.body?.session_id;
+    const query = typeof req.body?.query === "string" ? req.body.query : "";
+    if (!sessionId || !query) return res.status(400).json({ error: { code: "INVALID_MEMORY_SEARCH", message: "session_id and query are required." } });
+    res.json({ object: "list", session_id: sessionId, data: await memoryManager.searchMemories(sessionId, query, req.body?.limit) });
+  });
+
+  app.patch("/v1/memories/:memoryId", async (req, res) => {
+    try {
+      const sessionId = req.header("x-session-id") || req.body?.session_id;
+      if (!sessionId) return res.status(400).json({ error: { code: "SESSION_REQUIRED", message: "session_id or X-Session-ID is required." } });
+      const memory = await memoryManager.updateMemory(sessionId, req.params.memoryId, req.body);
+      if (!memory) return res.status(404).json({ error: { code: "MEMORY_NOT_FOUND", message: "Memory not found." } });
+      res.json(memory);
+    } catch (error) {
+      const normalized = normalizeError(error);
+      res.status(normalized.status).json({ error: { message: normalized.message, type: normalized.type, code: normalized.code } });
+    }
+  });
+
+  app.delete("/v1/memories/:memoryId", async (req, res) => {
+    const sessionId = req.header("x-session-id") || req.query.session_id;
+    if (!sessionId) return res.status(400).json({ error: { code: "SESSION_REQUIRED", message: "session_id or X-Session-ID is required." } });
+    const removed = await memoryManager.deleteMemory(sessionId, req.params.memoryId);
+    res.status(removed ? 200 : 404).json({ ok: removed });
+  });
+
   app.get("/v1/conversations", (_req, res) => {
     res.json({ object: "conversations", ...conversationManager.status() });
   });
@@ -107,7 +152,13 @@ export function createApp({
       const model = typeof req.body?.model === "string" ? req.body.model : "browser";
       const provider = router.get(model);
       const memoryEnabled = req.body?.memory !== false && config.memoryEnabled;
-      const conversation = conversationManager.ensure(sessionId, provider.name);
+      let conversation = null;
+      const requestedConversationId = typeof req.body?.conversation_id === "string" ? req.body.conversation_id : null;
+      if (requestedConversationId) {
+        const existing = conversationManager.get(requestedConversationId);
+        if (existing && existing.sessionId === sessionId && existing.provider === provider.name) conversation = existing;
+      }
+      if (!conversation) conversation = conversationManager.ensure(sessionId, provider.name);
       const contextMessages = await memoryManager.buildContext(sessionId, messages, memoryEnabled);
 
       res.setHeader("X-Request-ID", requestId);
