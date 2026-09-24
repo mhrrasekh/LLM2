@@ -107,3 +107,13 @@ test("API rejects invalid messages", async () => {
     await new Promise(resolve => server.close(resolve));
   }
 });
+
+
+test("SessionManager creates and reuses sessions", async () => {
+  const { SessionManager } = await import("../src/session-manager.js");
+  const manager = new SessionManager({ ttlMs: 1000, maxSessions: 2 });
+  const first = manager.create();
+  assert.match(first, /^sess_/);
+  assert.equal(manager.ensure(first).id, first);
+  assert.equal(manager.status().active, 1);
+});
