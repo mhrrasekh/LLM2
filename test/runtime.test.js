@@ -163,3 +163,31 @@ test("MemoryManager persists and rebuilds conversation context", async () => {
   const fs = await import("node:fs/promises");
   await fs.rm(filePath, { force: true });
 });
+
+
+test("ConversationManager isolates providers per session", async () => {
+  const { ConversationManager } = await import("../src/conversation-manager.js");
+  const manager = new ConversationManager({ ttlMs: 1000, maxConversations: 10 });
+  const chatgpt = manager.ensure("sess_a", "chatgpt-web");
+  assert.equal(manager.ensure("sess_a", "chatgpt-web").id, chatgpt.id);
+  const gemini = manager.ensure("sess_a", "gemini-web");
+  assert.notEqual(gemini.id, chatgpt.id);
+  assert.equal(manager.get(chatgpt.id).provider, "chatgpt-web");
+});
+
+test("MemoryManager creates a long-term summary after threshold", async () => {
+  const { MemoryManager } = await import("../src/memory-manager.js");
+  const filePath = (await import("node:os")).tmpdir() + "/llm2-summary-" + Date.now() + ".json";
+  const manager = new MemoryManager({ filePath, summaryEvery: 4, maxMessagesPerSession: 20 });
+  await manager.remember("sess_summary", [
+    { role: "user", content: "First preference" },
+    { role: "assistant", content: "First answer" },
+    { role: "user", content: "Second preference" },
+    { role: "assistant", content: "Second answer" }
+  ]);
+  const record = await manager.getRecord("sess_summary");
+  assert.ok(record.summary.includes("First preference"));
+  assert.ok(record.messages.length <= 4);
+  const fs = await import("node:fs/promises");
+  await fs.rm(filePath, { force: true });
+});
