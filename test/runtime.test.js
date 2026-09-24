@@ -219,3 +219,17 @@ test("MemoryManager supports add, update and delete memory", async () => {
   assert.equal((await manager.listMemories("sess_crud")).length, 0);
   await import("node:fs/promises").then(fs => fs.rm(filePath, { force: true }));
 });
+
+
+test("ConversationManager stores native provider conversation state", async () => {
+  const { ConversationManager } = await import("../src/conversation-manager.js");
+  const manager = new ConversationManager();
+  const conversation = manager.ensure("sess_native", "chatgpt-web", {
+    native: true,
+    nativeId: "abc-123",
+    nativeUrl: "https://chatgpt.com/c/abc-123"
+  });
+  assert.equal(conversation.native, true);
+  assert.equal(conversation.nativeId, "abc-123");
+  assert.equal(conversation.nativeUrl, "https://chatgpt.com/c/abc-123");
+});
