@@ -1,6 +1,7 @@
 import { getContext } from "../browser.js";
 import { config } from "../config.js";
 import { BaseProvider, ProviderError } from "./base.js";
+import { CHATGPT_CAPABILITIES } from "./capabilities.js";
 
 const inputSelectors = [
   "#prompt-textarea",
@@ -19,6 +20,10 @@ const sendSelectors = [
 export class ChatGPTProvider extends BaseProvider {
   get name() {
     return "chatgpt-web";
+  }
+
+  get capabilities() {
+    return CHATGPT_CAPABILITIES;
   }
 
   async ensurePage() {
