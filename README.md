@@ -199,3 +199,55 @@ Current URL recognition:
 This is deliberately conservative. The bridge does not read cookies, authentication tokens, private browser storage, or provider API credentials. It only uses the visible browser URL and normal Web UI navigation.
 
 Provider UI layouts can change, so native recognition/navigation must be verified with a real logged-in browser session before being treated as production-stable.
+
+
+## v0.9 Local Project Bridge
+
+The bridge can now connect to explicitly registered local project workspaces. This is a local filesystem capability; it does not grant arbitrary computer access.
+
+Register a project:
+
+~~~text
+POST /v1/projects
+{
+  "id": "ezshope",
+  "name": "EZSHOPE",
+  "root": "C:/Users/sinaaaaaa/Desktop/EZSHOPE",
+  "testCommand": ["npm", "test"],
+  "buildCommand": ["npm", "run", "build"]
+}
+~~~
+
+Project endpoints:
+
+- `GET /v1/projects` — list registered workspaces
+- `POST /v1/projects` — register a workspace
+- `DELETE /v1/projects/:projectId` — unregister a workspace
+- `GET /v1/projects/:projectId/file?path=...` — read a project file
+- `PUT /v1/projects/:projectId/file` — write a project file
+- `GET /v1/projects/:projectId/search?q=...` — search project text
+- `GET /v1/projects/:projectId/git/status` — git status
+- `GET /v1/projects/:projectId/git/diff` — diff summary
+- `GET /v1/projects/:projectId/git/diffFull` — full diff
+- `GET /v1/projects/:projectId/git/log` — recent commits
+- `POST /v1/projects/:projectId/run/test` — run the configured test command
+- `POST /v1/projects/:projectId/run/build` — run the configured build command
+
+Safety boundary:
+
+- Only explicitly registered project roots are accessible.
+- File paths are checked to prevent escaping the workspace.
+- File reads/writes have a configurable size limit.
+- Search skips common generated/dependency directories such as `.git`, `node_modules`, `dist` and `target`.
+- Git operations are limited to read-only status/diff/log operations.
+- Command execution is limited to commands explicitly configured on the project.
+- The bridge does not read browser cookies, provider tokens or credentials.
+
+Configuration:
+
+- `PROJECTS_FILE=./data/projects.json`
+- `MAX_PROJECTS=50`
+- `MAX_PROJECT_FILE_BYTES=2000000`
+- `MAX_PROJECT_SEARCH_RESULTS=100`
+
+The project bridge is designed so a future UI or coding agent can use these capabilities as explicit tools instead of giving an LLM unrestricted access to the computer.
