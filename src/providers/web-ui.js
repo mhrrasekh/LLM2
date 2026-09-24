@@ -59,7 +59,6 @@ export class WebUIProvider extends BaseProvider {
 
   async chat(messages) {
     const page = await this.ensurePage();
-    await page.bringToFront();
     const input = await this.findVisible(page, this.definition.inputSelectors);
     if (!input) throw new ProviderError(this.definition.errors.input, this.definition.errors.inputMessage);
 
