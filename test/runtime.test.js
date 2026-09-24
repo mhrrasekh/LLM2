@@ -191,3 +191,31 @@ test("MemoryManager creates a long-term summary after threshold", async () => {
   const fs = await import("node:fs/promises");
   await fs.rm(filePath, { force: true });
 });
+
+
+test("MemoryManager extracts and retrieves explicit user memories", async () => {
+  const { MemoryManager } = await import("../src/memory-manager.js");
+  const filePath = (await import("node:os")).tmpdir() + "/llm2-intel-" + Date.now() + ".json";
+  const manager = new MemoryManager({ filePath });
+  await manager.remember("sess_intel", [{ role: "user", content: "My name is Sina." }]);
+  await manager.remember("sess_intel", [{ role: "user", content: "I prefer dark mode." }]);
+  const memories = await manager.listMemories("sess_intel");
+  assert.ok(memories.some(item => item.value === "Sina"));
+  assert.ok(memories.some(item => item.value === "dark mode"));
+  const relevant = await manager.searchMemories("sess_intel", "What mode do I prefer?");
+  assert.ok(relevant.some(item => item.value === "dark mode"));
+  await import("node:fs/promises").then(fs => fs.rm(filePath, { force: true }));
+});
+
+test("MemoryManager supports add, update and delete memory", async () => {
+  const { MemoryManager } = await import("../src/memory-manager.js");
+  const filePath = (await import("node:os")).tmpdir() + "/llm2-crud-" + Date.now() + ".json";
+  const manager = new MemoryManager({ filePath });
+  const created = await manager.addMemory("sess_crud", { type: "preference", key: "editor", value: "VS Code", importance: 0.9 });
+  assert.equal(created.value, "VS Code");
+  const updated = await manager.updateMemory("sess_crud", created.id, { value: "Neovim" });
+  assert.equal(updated.value, "Neovim");
+  assert.equal(await manager.deleteMemory("sess_crud", created.id), true);
+  assert.equal((await manager.listMemories("sess_crud")).length, 0);
+  await import("node:fs/promises").then(fs => fs.rm(filePath, { force: true }));
+});
