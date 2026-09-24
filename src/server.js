@@ -197,6 +197,15 @@ export function createApp({
     }
   });
 
+  app.get("/v1/projects/:projectId/context", async (req, res) => {
+    try {
+      res.json(await projectManager.context(req.params.projectId, req.query.q, Math.min(Number(req.query.max_files) || 8, 20)));
+    } catch (error) {
+      const normalized = normalizeError(error);
+      res.status(normalized.status).json({ error: { message: normalized.message, type: normalized.type, code: normalized.code } });
+    }
+  });
+
   app.get("/v1/projects/:projectId/git/:operation", async (req, res) => {
     try {
       res.json(await projectManager.git(req.params.projectId, req.params.operation));
