@@ -178,3 +178,24 @@ Privacy:
 Configuration:
 - `MAX_MEMORY_MEMORIES=100`
 - `MEMORY_RELEVANCE_LIMIT=8`
+
+
+## v0.8 Native Web Conversations
+
+v0.8 connects gateway conversations to detectable native Web UI conversation URLs.
+
+When a provider exposes a recognizable conversation URL after a successful response, the bridge records:
+- `native: true`
+- `nativeId`
+- `nativeUrl`
+
+On a later request with the same `conversation_id`, the bridge attempts to navigate the provider Web UI back to that native conversation before sending the next message.
+
+Current URL recognition:
+- ChatGPT: `/c/<id>`
+- Gemini: `/app/<id>`
+- Claude: `/chat/<id>`
+
+This is deliberately conservative. The bridge does not read cookies, authentication tokens, private browser storage, or provider API credentials. It only uses the visible browser URL and normal Web UI navigation.
+
+Provider UI layouts can change, so native recognition/navigation must be verified with a real logged-in browser session before being treated as production-stable.
