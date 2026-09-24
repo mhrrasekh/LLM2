@@ -10,6 +10,7 @@ import { ProviderError } from "./providers/base.js";
 import { SessionManager } from "./session-manager.js";
 import { MemoryManager } from "./memory-manager.js";
 import { ConversationManager } from "./conversation-manager.js";
+import { ProjectManager } from "./project-manager.js";
 
 export function createApp({
   router = createProviderRouter(),
@@ -27,6 +28,12 @@ export function createApp({
   conversationManager = new ConversationManager({
     ttlMs: config.sessionTtlMs,
     maxConversations: config.maxConversations
+  }),
+  projectManager = new ProjectManager({
+    filePath: config.projectsFile,
+    maxProjects: config.maxProjects,
+    maxFileBytes: config.maxProjectFileBytes,
+    maxSearchResults: config.maxProjectSearchResults
   })
 } = {}) {
   const app = express();
@@ -138,6 +145,77 @@ export function createApp({
   app.delete("/v1/conversations/:conversationId", (req, res) => {
     const removed = conversationManager.remove(req.params.conversationId);
     res.status(removed ? 200 : 404).json({ ok: removed });
+  });
+
+  app.get("/v1/projects", async (_req, res) => {
+    res.json({ object: "projects", data: await projectManager.list() });
+  });
+
+  app.post("/v1/projects", async (req, res) => {
+    try {
+      res.status(201).json(await projectManager.add(req.body));
+    } catch (error) {
+      const normalized = normalizeError(error);
+      res.status(normalized.status).json({ error: { message: normalized.message, type: normalized.type, code: normalized.code } });
+    }
+  });
+
+  app.delete("/v1/projects/:projectId", async (req, res) => {
+    try {
+      const removed = await projectManager.remove(req.params.projectId);
+      res.status(removed ? 200 : 404).json({ ok: removed });
+    } catch (error) {
+      const normalized = normalizeError(error);
+      res.status(normalized.status).json({ error: { message: normalized.message, type: normalized.type, code: normalized.code } });
+    }
+  });
+
+  app.get("/v1/projects/:projectId/file", async (req, res) => {
+    try {
+      res.json(await projectManager.readFile(req.params.projectId, req.query.path));
+    } catch (error) {
+      const normalized = normalizeError(error);
+      res.status(normalized.status).json({ error: { message: normalized.message, type: normalized.type, code: normalized.code } });
+    }
+  });
+
+  app.put("/v1/projects/:projectId/file", async (req, res) => {
+    try {
+      res.json(await projectManager.writeFile(req.params.projectId, req.body?.path, req.body?.content));
+    } catch (error) {
+      const normalized = normalizeError(error);
+      res.status(normalized.status).json({ error: { message: normalized.message, type: normalized.type, code: normalized.code } });
+    }
+  });
+
+  app.get("/v1/projects/:projectId/search", async (req, res) => {
+    try {
+      res.json(await projectManager.search(req.params.projectId, req.query.q));
+    } catch (error) {
+      const normalized = normalizeError(error);
+      res.status(normalized.status).json({ error: { message: normalized.message, type: normalized.type, code: normalized.code } });
+    }
+  });
+
+  app.get("/v1/projects/:projectId/git/:operation", async (req, res) => {
+    try {
+      res.json(await projectManager.git(req.params.projectId, req.params.operation));
+    } catch (error) {
+      const normalized = normalizeError(error);
+      res.status(normalized.status).json({ error: { message: normalized.message, type: normalized.type, code: normalized.code } });
+    }
+  });
+
+  app.post("/v1/projects/:projectId/run/:kind", async (req, res) => {
+    try {
+      if (!["test", "build"].includes(req.params.kind)) {
+        return res.status(400).json({ error: { code: "INVALID_COMMAND_KIND", message: "Allowed commands: test, build." } });
+      }
+      res.json(await projectManager.runConfigured(req.params.projectId, req.params.kind));
+    } catch (error) {
+      const normalized = normalizeError(error);
+      res.status(normalized.status).json({ error: { message: normalized.message, type: normalized.type, code: normalized.code } });
+    }
   });
 
   app.get("/v1/models", (_req, res) => {
