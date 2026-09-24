@@ -2,7 +2,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 
-const DEFAULT_IGNORES = new Set([".git", "node_modules", ".next", "dist", "build", "target", "coverage"]);\nconst PROTECTED_NAMES = new Set([".env", ".env.local", ".env.production", ".env.development", ".env.test", "credentials.json", "secrets.json"]);\nconst PROTECTED_SUFFIXES = [".pem", ".key"];
+const DEFAULT_IGNORES = new Set([".git", "node_modules", ".next", "dist", "build", "target", "coverage"]);
+const PROTECTED_NAMES = new Set([".env", ".env.local", ".env.production", ".env.development", ".env.test", "credentials.json", "secrets.json"]);\nconst PROTECTED_SUFFIXES = [".pem", ".key"];
 
 export class ProjectManager {
   constructor({ filePath = "./data/projects.json", maxProjects = 50, maxFileBytes = 2_000_000, maxSearchResults = 100 } = {}) {
@@ -84,10 +85,16 @@ export class ProjectManager {
     if (target !== root && !target.startsWith(root + path.sep)) {
       throw projectError("PROJECT_PATH_FORBIDDEN", "Path is outside the project workspace.", 403);
     }
+    const realRoot = await fs.realpath(root);
+    const realTarget = await realPathOrParent(target);
+    if (realTarget !== realRoot && !realTarget.startsWith(realRoot + path.sep)) {
+      throw projectError("PROJECT_PATH_FORBIDDEN", "Resolved path is outside the project workspace.", 403);
+    }
     return { project, root, target, relative: path.relative(root, target) };
   }
 
   async readFile(id, relativePath) {
+    assertReadable(relativePath);
     const resolved = await this.resolveFile(id, relativePath);
     const stat = await fs.stat(resolved.target);
     if (!stat.isFile()) throw projectError("NOT_A_FILE", "Project path is not a file.", 400);
@@ -101,12 +108,32 @@ export class ProjectManager {
   }
 
   async writeFile(id, relativePath, content) {
+    assertWritable(relativePath);
     const resolved = await this.resolveFile(id, relativePath);
     if (typeof content !== "string") throw projectError("INVALID_CONTENT", "content must be a string.", 400);
     if (Buffer.byteLength(content, "utf8") > this.maxFileBytes) throw projectError("FILE_TOO_LARGE", "File exceeds the configured size limit.", 413);
     await fs.mkdir(path.dirname(resolved.target), { recursive: true });
     await fs.writeFile(resolved.target, content, "utf8");
     return { project: resolved.project.id, path: resolved.relative, bytes: Buffer.byteLength(content, "utf8") };
+  }
+
+  async listFiles(id, relativePath = "") {
+    const resolved = await this.resolveFile(id, relativePath || ".");
+    const stat = await fs.stat(resolved.target);
+    if (!stat.isDirectory()) throw projectError("NOT_A_DIRECTORY", "Project path is not a directory.", 400);
+    const entries = await fs.readdir(resolved.target, { withFileTypes: true });
+    return {
+      project: resolved.project.id,
+      path: resolved.relative || ".",
+      entries: entries
+        .filter(entry => !DEFAULT_IGNORES.has(entry.name))
+        .map(entry => ({
+          name: entry.name,
+          path: path.join(resolved.relative || "", entry.name),
+          type: entry.isDirectory() ? "directory" : "file"
+        }))
+        .sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name))
+    };
   }
 
   async search(id, query) {
@@ -116,7 +143,7 @@ export class ProjectManager {
     if (!needle) throw projectError("INVALID_SEARCH", "query is required.", 400);
     const results = [];
     await walk(project.root, async file => {
-      if (results.length >= this.maxSearchResults) return;
+      if (results.length >= this.maxSearchResults || isProtectedPath(file)) return;
       try {
         const stat = await fs.stat(file);
         if (!stat.isFile() || stat.size > this.maxFileBytes) return;
@@ -138,7 +165,7 @@ export class ProjectManager {
     if (!needle) throw projectError("INVALID_CONTEXT_QUERY", "query is required.", 400);
     const matches = [];
     await walk(project.root, async file => {
-      if (matches.length >= maxFiles) return;
+      if (matches.length >= maxFiles || isProtectedPath(file)) return;
       try {
         const stat = await fs.stat(file);
         if (!stat.isFile() || stat.size > this.maxFileBytes) return;
@@ -233,7 +260,8 @@ function projectError(code, message, status) {
   return error;
 }
 
-\nasync function realPathOrParent(target) {
+
+async function realPathOrParent(target) {
   try { return await fs.realpath(target); }
   catch (error) {
     if (error.code !== "ENOENT") throw error;
@@ -243,9 +271,13 @@ function projectError(code, message, status) {
   }
 }
 
+function isProtectedPath(filePath) {
+  const base = path.basename(filePath).toLowerCase();
+  return PROTECTED_NAMES.has(base) || PROTECTED_SUFFIXES.some(suffix => base.endsWith(suffix));
+}
+
 function assertReadable(relativePath) {
-  const base = path.basename(relativePath).toLowerCase();
-  if (PROTECTED_NAMES.has(base) || PROTECTED_SUFFIXES.some(suffix => base.endsWith(suffix))) {
+  if (isProtectedPath(String(relativePath || ""))) {
     throw projectError("PROTECTED_FILE", "Access to protected credential/key files is blocked.", 403);
   }
 }
