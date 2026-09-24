@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { RequestManager } from "../src/request-manager.js";
 import { createApp } from "../src/server.js";
+import { ProviderRouter } from "../src/providers/router.js";
 
 test("RequestManager serializes tasks", async () => {
   const manager = new RequestManager({ maxQueueSize: 2 });
@@ -53,7 +54,7 @@ test("API validates and returns OpenAI-compatible completion", async () => {
   };
 
   const app = createApp({
-    providers: new Map([["browser", provider]]),
+    router: new ProviderRouter(new Map([["browser", provider]])),
     requestManager: new RequestManager({ maxQueueSize: 2 })
   });
 
@@ -85,7 +86,7 @@ test("API validates and returns OpenAI-compatible completion", async () => {
 
 test("API rejects invalid messages", async () => {
   const app = createApp({
-    providers: new Map(),
+    router: new ProviderRouter(new Map()),
     requestManager: new RequestManager({ maxQueueSize: 1 })
   });
 
@@ -116,4 +117,23 @@ test("SessionManager creates and reuses sessions", async () => {
   assert.match(first, /^sess_/);
   assert.equal(manager.ensure(first).id, first);
   assert.equal(manager.status().active, 1);
+});
+
+
+test("ProviderRouter exposes explicit browser providers", async () => {
+  const { createProviderRouter } = await import("../src/providers/router.js");
+  const router = createProviderRouter();
+  assert.equal(router.get("chatgpt").name, "chatgpt-web");
+  assert.equal(router.get("gemini").name, "gemini-web");
+  assert.equal(router.get("claude").name, "claude-web");
+  assert.equal(router.list().length, 4);
+});
+
+test("ProviderRouter rejects unknown models", async () => {
+  const { ProviderRouter } = await import("../src/providers/router.js");
+  const router = new ProviderRouter();
+  await assert.rejects(
+    Promise.resolve().then(() => router.get("unknown")),
+    error => error.code === "MODEL_NOT_FOUND" && error.status === 404
+  );
 });
