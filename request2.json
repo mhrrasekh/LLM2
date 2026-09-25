@@ -1,0 +1,9 @@
+﻿{
+  "model": "chatgpt",
+  "messages": [
+    {
+      "role": "user",
+      "content": "اسم من چیست؟"
+    }
+  ]
+}
