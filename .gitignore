@@ -4,3 +4,7 @@ data/
 .env
 *.log
 .DS_Store
+
+# local curl/API test artifacts
+cookies.txt
+request*.json

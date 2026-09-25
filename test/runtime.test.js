@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { RequestManager } from "../src/request-manager.js";
 import { createApp } from "../src/server.js";
 import { ProviderRouter } from "../src/providers/router.js";
+import { config } from "../src/config.js";
 
 test("RequestManager serializes tasks", async () => {
   const manager = new RequestManager({ maxQueueSize: 2 });
@@ -50,6 +51,9 @@ test("API validates and returns OpenAI-compatible completion", async () => {
     async chat(messages) {
       assert.equal(messages.length, 2);
       return "mock response";
+    },
+    async getConversationState() {
+      return { native: false, nativeId: null, nativeUrl: null };
     }
   };
 
@@ -109,6 +113,63 @@ test("API rejects invalid messages", async () => {
   }
 });
 
+test("Health endpoint exposes runtime metadata", async () => {
+  const app = createApp({
+    router: new ProviderRouter(new Map()),
+    requestManager: new RequestManager({ maxQueueSize: 1 })
+  });
+
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise(resolve => server.once("listening", resolve));
+  const port = server.address().port;
+
+  try {
+    const response = await fetch("http://127.0.0.1:" + port + "/health");
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.port, config.port);
+    assert.ok(Number.isInteger(body.uptime) && body.uptime >= 0);
+    assert.equal(typeof body.memory.enabled, "boolean");
+    assert.ok(Number.isInteger(body.memory.summaryEvery) && body.memory.summaryEvery > 0);
+    assert.equal(Number.isInteger(body.queue.failures), true);
+    assert.equal(body.queue.failures, 0);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test("Request queue counts failed requests", async () => {
+  const provider = {
+    name: "mock-fail",
+    async health() { return { provider: "mock-fail", ready: true }; },
+    async chat() { throw new Error("provider down"); },
+    async getConversationState() { return { native: false, nativeId: null, nativeUrl: null }; }
+  };
+
+  const app = createApp({
+    router: new ProviderRouter(new Map([["browser", provider]])),
+    requestManager: new RequestManager({ maxQueueSize: 2 })
+  });
+
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise(resolve => server.once("listening", resolve));
+  const port = server.address().port;
+
+  try {
+    const response = await fetch("http://127.0.0.1:" + port + "/v1/chat/completions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ model: "browser", messages: [{ role: "user", content: "Hello" }] })
+    });
+    assert.equal(response.status, 500);
+
+    const health = await (await fetch("http://127.0.0.1:" + port + "/health")).json();
+    assert.equal(health.queue.failures, 1);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
 
 test("SessionManager creates and reuses sessions", async () => {
   const { SessionManager } = await import("../src/session-manager.js");
@@ -126,7 +187,11 @@ test("ProviderRouter exposes explicit browser providers", async () => {
   assert.equal(router.get("chatgpt").name, "chatgpt-web");
   assert.equal(router.get("gemini").name, "gemini-web");
   assert.equal(router.get("claude").name, "claude-web");
-  assert.equal(router.list().length, 4);
+  assert.deepEqual(
+    router.list().map(model => model.id),
+    ["browser", "chatgpt", "gemini", "claude", "grok", "deepseek", "qwen", "mistral", "perplexity"]
+  );
+  assert.equal(router.list().length, 9);
 });
 
 test("ProviderRouter rejects unknown models", async () => {
@@ -153,9 +218,11 @@ test("MemoryManager persists and rebuilds conversation context", async () => {
     { role: "user", content: "What is my name?" }
   ], true);
 
-  assert.equal(context.length, 3);
-  assert.equal(context[0].content, "My name is Sina.");
-  assert.equal(context[2].content, "What is my name?");
+  assert.equal(context.length, 4);
+  assert.ok(context[0].content.startsWith("[RELEVANT_USER_MEMORY]"));
+  assert.ok(context[0].content.includes("profile = Sina"));
+  assert.equal(context[1].content, "My name is Sina.");
+  assert.equal(context[3].content, "What is my name?");
 
   const restored = new MemoryManager({ filePath, maxMessagesPerSession: 10 });
   assert.equal((await restored.get(sessionId)).length, 2);

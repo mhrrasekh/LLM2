@@ -8,7 +8,7 @@ Client -> HTTP API -> validation -> request queue -> provider adapter -> Playwri
 
 ## Requirements
 
-- Node.js 20+
+- Node.js 24+
 - Google Chrome
 - Normal ChatGPT Web login
 
@@ -23,7 +23,7 @@ The default automation profile is `./browser-profile`. Keep it separate from you
 
 ## Endpoints
 
-- `GET /health` — bridge, browser and queue status
+- `GET /health` — bridge runtime status: uptime, port, browser, queue (including failure count), sessions, memory and conversations
 - `GET /ready` — provider readiness
 - `GET /v1/models` — available bridge models
 - `POST /v1/chat/completions` — OpenAI-compatible chat response
@@ -225,7 +225,9 @@ Project endpoints:
 - `DELETE /v1/projects/:projectId` — unregister a workspace
 - `GET /v1/projects/:projectId/file?path=...` — read a project file
 - `PUT /v1/projects/:projectId/file` — write a project file
+- `GET /v1/projects/:projectId/files?path=...` — directory listing (blocked entries such as `.git`/`node_modules` are hidden)
 - `GET /v1/projects/:projectId/search?q=...` — search project text
+- `GET /v1/projects/:projectId/context?q=...` — collect matching file contents as AI context
 - `GET /v1/projects/:projectId/git/status` — git status
 - `GET /v1/projects/:projectId/git/diff` — diff summary
 - `GET /v1/projects/:projectId/git/diffFull` — full diff

@@ -3,10 +3,11 @@ export class RequestManager {
     this.maxQueueSize = maxQueueSize;
     this.running = false;
     this.queue = [];
+    this.failures = 0;
   }
 
   get status() {
-    return { running: this.running, queued: this.queue.length };
+    return { running: this.running, queued: this.queue.length, failures: this.failures };
   }
 
   run(task) {
@@ -33,6 +34,7 @@ export class RequestManager {
     try {
       item.resolve(await item.task());
     } catch (error) {
+      this.failures++;
       item.reject(error);
     } finally {
       this.running = false;

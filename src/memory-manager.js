@@ -174,12 +174,12 @@ export class MemoryManager {
       if (!message || message.role !== "user" || typeof message.content !== "string") continue;
       const text = message.content.trim();
       const patterns = [
-        { type: "fact", re: /^(?:my name is|i am|i'm)\\s+(.{1,120})[.!]?$/i, key: "profile" },
-        { type: "fact", re: /^اسم من\\s+(.{1,120})[.!؟]?$/u, key: "profile" },
-        { type: "preference", re: /^(?:i prefer|i like|i love)\\s+(.{1,160})[.!]?$/i, key: "preference" },
-        { type: "preference", re: /^(?:من ترجیح می.?دهم|من دوست دارم)\\s+(.{1,160})[.!؟]?$/u, key: "preference" },
-        { type: "goal", re: /^(?:my goal is|i want to|i need to)\\s+(.{1,160})[.!]?$/i, key: "goal" },
-        { type: "goal", re: /^(?:هدف من|می.?خواهم|لازم دارم)\\s+(.{1,160})[.!؟]?$/u, key: "goal" }
+        { type: "fact", re: /^(?:my name is|i am|i'm)\s+(.{1,120}?)[.!]?$/i, key: "profile" },
+        { type: "fact", re: /^اسم من\s+(.{1,120}?)[.!؟]?$/u, key: "profile" },
+        { type: "preference", re: /^(?:i prefer|i like|i love)\s+(.{1,160}?)[.!]?$/i, key: "preference" },
+        { type: "preference", re: /^(?:من ترجیح می.?دهم|من دوست دارم)\s+(.{1,160}?)[.!؟]?$/u, key: "preference" },
+        { type: "goal", re: /^(?:my goal is|i want to|i need to)\s+(.{1,160}?)[.!]?$/i, key: "goal" },
+        { type: "goal", re: /^(?:هدف من|می.?خواهم|لازم دارم)\s+(.{1,160}?)[.!؟]?$/u, key: "goal" }
       ];
       for (const pattern of patterns) {
         const match = text.match(pattern.re);
@@ -220,7 +220,10 @@ export class MemoryManager {
         .slice(0, this.maxMemoriesPerSession);
     }
     if (record.messages.length >= this.summaryEvery) {
-      const keep = Math.max(6, Math.floor(this.summaryEvery / 2));
+      const keep = Math.min(
+        Math.max(6, Math.floor(this.summaryEvery / 2)),
+        Math.max(1, this.summaryEvery - 1)
+      );
       const archived = record.messages.slice(0, -keep);
       record.summary = this.mergeSummary(record.summary, archived).slice(-this.maxSummaryChars);
       record.messages = record.messages.slice(-keep);

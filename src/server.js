@@ -51,10 +51,16 @@ export function createApp({
     res.json({
       ok: true,
       service: "browser-llm-bridge",
+      port: config.port,
+      uptime: Math.round(process.uptime()),
       browser,
       queue: requestManager.status,
       sessions: sessionManager.status(),
-      memory: await memoryManager.status(),
+      memory: {
+        ...(await memoryManager.status()),
+        enabled: config.memoryEnabled,
+        summaryEvery: config.memorySummaryEvery
+      },
       conversations: conversationManager.status()
     });
   });

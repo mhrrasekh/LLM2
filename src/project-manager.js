@@ -126,7 +126,7 @@ export class ProjectManager {
     return {
       project: resolved.project.id,
       path: resolved.relative || ".",
-      entries: entries
+      items: entries
         .filter(entry => !DEFAULT_IGNORES.has(entry.name))
         .map(entry => ({
           name: entry.name,
